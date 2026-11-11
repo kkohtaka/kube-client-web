@@ -3,7 +3,7 @@
 A Kubernetes client library for the browser, with informer support.
 
 > **Status:** early development. Nothing is published yet and the API is not stable.
-> REST operations work today; watch and informers are not implemented yet.
+> REST operations and watch work today; informers are not implemented yet.
 
 ## Goals
 
@@ -83,6 +83,50 @@ try {
 ```
 
 Every operation accepts an `AbortSignal` as `signal`.
+
+### Watch
+
+A watch is an async iterator of change events. `watch` is a single connection,
+which the server closes after a while:
+
+```ts
+const list = await configMaps.list({ namespace: "default" });
+
+for await (const event of configMaps.watch({
+  namespace: "default",
+  resourceVersion: list.metadata?.resourceVersion,
+})) {
+  if (event.type === "BOOKMARK") continue; // progress marker, no change
+  console.log(event.type, event.object.metadata?.name); // ADDED, MODIFIED or DELETED
+}
+```
+
+`watchWithReconnect` keeps going: when a connection closes or fails it connects
+again from the last version it saw, waiting longer after repeated failures. It
+only ends by throwing, either because `signal` aborted or because the server
+gave an answer that retrying cannot change. The one to expect is 410 Gone: the
+version to resume from is too old, and the caller has to list again.
+
+```ts
+const stop = new AbortController();
+try {
+  for await (const event of configMaps.watchWithReconnect({
+    namespace: "default",
+    resourceVersion: list.metadata?.resourceVersion,
+    idleTimeoutMs: 120_000, // reconnect if the connection goes silent
+    signal: stop.signal,
+  })) {
+    // ...
+  }
+} catch (error) {
+  if (isGone(error)) {
+    // list again, then watch from the new resourceVersion
+  }
+}
+```
+
+Leaving the loop or aborting `signal` closes the connection. Keeping a local
+cache in sync, including the list-again step, is what informers will do.
 
 ## Cluster requirements
 
