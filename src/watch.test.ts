@@ -556,3 +556,41 @@ describe("a connection the server should have ended", () => {
     await events.return();
   });
 });
+
+describe("a fetch implementation that does not react to being aborted", () => {
+  /** Answers with a body that never delivers anything and ignores the signal. */
+  function deafResource(): ResourceClient<ConfigMap> {
+    const fetch: typeof globalThis.fetch = async () =>
+      new Response(new ReadableStream<Uint8Array>(), { status: 200 });
+    return createClient({ baseUrl: "https://k8s.example.test", fetch }).resource(configMaps);
+  }
+
+  it("still gives up on an overdue connection", async () => {
+    vi.useFakeTimers();
+    const first = deafResource()
+      .watch({ timeoutSeconds: 10 })
+      .next()
+      .catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(await first).toBeInstanceOf(WatchTimeoutError);
+  });
+
+  it("still gives up on an idle connection", async () => {
+    vi.useFakeTimers();
+    const first = deafResource()
+      .watch({ idleTimeoutMs: 1000 })
+      .next()
+      .catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await first).toBeInstanceOf(WatchTimeoutError);
+  });
+
+  it("still stops when the caller aborts", async () => {
+    const abort = new AbortController();
+    const first = deafResource().watch({ signal: abort.signal }).next();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const reason = new Error("stop");
+    abort.abort(reason);
+    await expect(settled(first)).rejects.toBe(reason);
+  });
+});
