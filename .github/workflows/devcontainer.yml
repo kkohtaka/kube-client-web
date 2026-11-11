@@ -1,0 +1,43 @@
+name: Dev container
+
+# Builds the dev container and runs the e2e tests inside it. This does not run
+# on every push: only when something the container depends on changes, and
+# weekly to catch breakage from outside the repository (base image, features,
+# browser dependencies).
+on:
+  push:
+    paths:
+      - .devcontainer/**
+      - .github/workflows/devcontainer.yml
+      - .node-version
+      - package.json
+      - pnpm-lock.yaml
+      - e2e/**
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devcontainer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check that tool versions match the project
+        run: |
+          node_version="$(cat .node-version)"
+          pnpm_version="$(jq -r .packageManager package.json | sed -e 's/^pnpm@//' -e 's/+.*$//')"
+          grep -Fq "\"version\": \"${node_version}\"" .devcontainer/devcontainer.json ||
+            { echo "::error::devcontainer.json does not install Node ${node_version} (.node-version)"; exit 1; }
+          grep -Fq "\"pnpmVersion\": \"${pnpm_version}\"" .devcontainer/devcontainer.json ||
+            { echo "::error::devcontainer.json does not install pnpm ${pnpm_version} (package.json)"; exit 1; }
+      - uses: devcontainers/ci@v0.3
+        with:
+          push: never
+          runCmd: pnpm e2e:up && pnpm test:e2e
