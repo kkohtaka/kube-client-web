@@ -8,6 +8,7 @@ export {
   type TokenSource,
 } from "./client.ts";
 export { ApiError, isGone } from "./errors.ts";
+export { Informer, type InformerEvents, type InformerOptions } from "./informer.ts";
 export {
   defineResource,
   type ResourceDescriptor,

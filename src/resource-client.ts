@@ -1,4 +1,5 @@
 import type { KubeClient, QueryValue } from "./client.ts";
+import { Informer, type InformerOptions } from "./informer.ts";
 import { type ResourceDescriptor, resourcePath } from "./resource.ts";
 import type { KubeList, KubeObject, Status } from "./types.ts";
 import {
@@ -248,6 +249,14 @@ export class ResourceClient<T extends KubeObject> {
   ): AsyncGenerator<WatchEvent<T>, void, undefined> {
     const { namespace, ...rest } = options;
     return watchWithReconnect<T>(this.#client, this.#path({ namespace }), rest);
+  }
+
+  /**
+   * Creates an informer: a local copy of the matching objects that is kept up
+   * to date, with events for every change. It does nothing until started.
+   */
+  informer(options: InformerOptions = {}): Informer<T> {
+    return new Informer<T>(this, options);
   }
 
   #path(options: {

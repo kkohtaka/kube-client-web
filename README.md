@@ -3,7 +3,7 @@
 A Kubernetes client library for the browser, with informer support.
 
 > **Status:** early development. Nothing is published yet and the API is not stable.
-> REST operations and watch work today; informers are not implemented yet.
+> REST operations, watch and informers work today.
 
 ## Goals
 
@@ -125,8 +125,45 @@ try {
 }
 ```
 
-Leaving the loop or aborting `signal` closes the connection. Keeping a local
-cache in sync, including the list-again step, is what informers will do.
+Leaving the loop or aborting `signal` closes the connection.
+
+### Informers
+
+An informer keeps a local copy of a set of objects up to date and tells you
+what changed. It lists the objects, watches from there, and lists again by
+itself whenever the watch cannot be resumed.
+
+```ts
+const informer = configMaps.informer({ namespace: "default", labelSelector: "app=web" });
+
+informer.on("add", (object) => {});
+informer.on("update", (object, previous) => {});
+informer.on("delete", (object) => {});
+informer.on("error", (error) => console.warn(error)); // it keeps trying by itself
+
+await informer.start(); // resolves once the first list is in the local copy
+
+informer.list(); // every object, without a request
+informer.get("settings", "default");
+
+informer.stop();
+```
+
+Things to know:
+
+- Register listeners before `start()`: the objects of the first list are
+  reported as `add`.
+- You see every object's latest state, but not necessarily every intermediate
+  one. After the informer had to list again, several changes to an object
+  arrive as a single `update`.
+- Errors do not stop an informer. It reports them and tries again with
+  increasing delays, so `start()` stays pending while the first list keeps
+  failing, for example for lack of permission. Call `stop()` to give up.
+- Each request asks for the token again, and watch connections are renewed
+  every five to ten minutes, so a refreshed token is picked up without
+  restarting the informer.
+- Objects in a list come without `apiVersion` and `kind`; the API server only
+  sets them on single objects and watch events.
 
 ## Cluster requirements
 
