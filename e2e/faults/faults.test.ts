@@ -56,6 +56,10 @@ describe("an informer", () => {
     const informer = resource.informer({
       namespace,
       labelSelector,
+      // Chromium and Firefox fail the open watch as soon as the server goes
+      // away. WebKit leaves it hanging, and the informer only finds out when
+      // the server does not end the watch on time, 30 seconds after this.
+      watchTimeoutSeconds: 5,
       backoff: { initialDelayMs: 200, maxDelayMs: 2000 },
     });
     cleanups.push(() => informer.stop());
@@ -68,14 +72,14 @@ describe("an informer", () => {
 
     await commands.restartApiServer();
 
-    // The outage was noticed and reported, and nothing was lost over it.
-    await eventually(() => errors.length > 0, "the outage to be reported", 30_000);
     await persistently(() => resource.create({ metadata: { name: after, namespace, labels } }));
     await eventually(
       () => informer.get(after, namespace) !== undefined,
       "the object created after the restart",
-      60_000,
+      90_000,
     );
+    // The outage was reported, and nothing was lost over it.
+    expect(errors.length).toBeGreaterThan(0);
     expect(
       informer
         .list()
