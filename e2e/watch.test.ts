@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { defineResource, isGone, type WatchEvent } from "../src/index.ts";
-import { type ConfigMap, client, configMaps, namespace, uniqueName } from "./fixtures.ts";
+import { ApiError, defineResource, isGone, type WatchEvent } from "../src/index.ts";
+import { type ConfigMap, client, configMaps, namespace, uniqueName, widgets } from "./fixtures.ts";
 
 const cleanups: (() => unknown)[] = [];
 
@@ -125,17 +125,25 @@ describe("watching from the browser", () => {
   });
 
   it("fails with 410 Gone for a resource version that is too old", async () => {
-    const events = client()
-      .resource(configMaps)
-      .watch({ namespace, resourceVersion: "1", signal: untilTestEnds() });
-    const error = await until(events, () => false).catch((e: unknown) => e);
+    // The custom resource was registered long after the cluster started, so
+    // the server no longer has the history back to version 1 for it. For
+    // built-in resources of a fresh cluster it still does.
+    const events = client().resource(widgets).watch({
+      namespace,
+      resourceVersion: "1",
+      timeoutSeconds: 5,
+      signal: untilTestEnds(),
+    });
+    const error = await events.next().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ApiError);
     expect(isGone(error)).toBe(true);
+    expect((error as ApiError).reason).toBe("Expired");
   });
 
   it("is refused without permission", async () => {
-    // The test identity can view everything except Secrets.
+    // Outside its own namespace the test identity can view everything except Secrets.
     const secrets = defineResource({ version: "v1", resource: "secrets", namespaced: true });
-    const events = client().resource(secrets).watch({ namespace });
+    const events = client().resource(secrets).watch({ namespace: "default" });
     await expect(events.next()).rejects.toMatchObject({ status: 403, reason: "Forbidden" });
   });
 
