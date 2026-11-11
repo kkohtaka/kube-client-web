@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, inject, it } from "vitest";
 import { commands } from "vitest/browser";
 import { ApiError, createClient } from "../../src/index.ts";
-import { client, configMaps, eventually, namespace, uniqueName } from "../fixtures.ts";
+import {
+  client,
+  configMaps,
+  eventually,
+  hidesUnauthenticatedAnswers,
+  namespace,
+  uniqueName,
+} from "../fixtures.ts";
 
 const cleanups: (() => unknown)[] = [];
 
@@ -105,7 +112,12 @@ describe("an informer", () => {
     // The API server remembers a valid token for a few seconds.
     await commands.revokeToken(first.secret);
     await eventually(
-      () => errors.some((error) => error instanceof ApiError && error.status === 401),
+      () =>
+        errors.some((error) =>
+          hidesUnauthenticatedAnswers
+            ? error instanceof TypeError
+            : error instanceof ApiError && error.status === 401,
+        ),
       "the informer to be turned away",
       60_000,
     );

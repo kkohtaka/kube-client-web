@@ -1,4 +1,5 @@
 import { inject } from "vitest";
+import { server } from "vitest/browser";
 import {
   createClient,
   defineResource,
@@ -6,6 +7,15 @@ import {
   type KubeObject,
   type ObjectMeta,
 } from "../src/index.ts";
+
+/**
+ * WebKit, at least as Playwright ships it for Linux, fails requests that the
+ * API server does not authenticate with a network error instead of showing
+ * the 401 or 403 answer. Other error answers arrive as usual. The API server
+ * closes the connection after answering such a request, which is the likely
+ * trigger.
+ */
+export const hidesUnauthenticatedAnswers: boolean = server.browser === "webkit";
 
 /** Namespace the test identity may write to. */
 export const namespace = "kube-client-web-e2e";

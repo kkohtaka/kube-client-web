@@ -1,6 +1,6 @@
 import { describe, expect, inject, it } from "vitest";
 import { ApiError, createClient } from "../src/index.ts";
-import { client, deployments, namespaces, pods } from "./fixtures.ts";
+import { client, deployments, hidesUnauthenticatedAnswers, namespaces, pods } from "./fixtures.ts";
 
 describe("reading from the browser", () => {
   it("runs in a real browser on a different origin than the API server", () => {
@@ -76,9 +76,12 @@ describe("errors from the browser", () => {
       .resource(pods)
       .list({ namespace: "kube-system" })
       .catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(ApiError);
-    expect([401, 403]).toContain((error as ApiError).status);
-    console.log("DIAG anonymous status", (error as ApiError).status);
+    if (hidesUnauthenticatedAnswers) {
+      expect(error).toBeInstanceOf(TypeError);
+    } else {
+      // kind lets anonymous requests in, as a user without any permission.
+      expect(error).toMatchObject({ status: 403, reason: "Forbidden" });
+    }
   });
 
   it("is rejected with a token the server does not accept", async () => {
@@ -87,17 +90,10 @@ describe("errors from the browser", () => {
       .resource(pods)
       .list({ namespace: "kube-system" })
       .catch((e: unknown) => e);
-    expect(error).toMatchObject({ status: 401, reason: "Unauthorized" });
-  });
-
-  it("DIAG raw anonymous fetch", async () => {
-    for (const init of [{}, { headers: { "X-Force-Preflight": "1" } }, { credentials: "omit" as const }]) {
-      try {
-        const response = await fetch(`${inject("apiServer")}/api/v1/namespaces/kube-system/pods`, init);
-        console.log("DIAG raw", JSON.stringify(init), response.status, JSON.stringify([...response.headers]));
-      } catch (error) {
-        console.log("DIAG raw", JSON.stringify(init), "failed:", String(error));
-      }
+    if (hidesUnauthenticatedAnswers) {
+      expect(error).toBeInstanceOf(TypeError);
+    } else {
+      expect(error).toMatchObject({ status: 401, reason: "Unauthorized" });
     }
   });
 
