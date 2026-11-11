@@ -34,14 +34,20 @@
   "packageManager": "pnpm@12.18.0",
   "scripts": {
     "build": "tsdown",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p e2e",
+    "test": "vitest run --project unit",
+    "test:watch": "vitest --project unit",
+    "test:e2e": "vitest run --project e2e",
+    "e2e:up": "./e2e/cluster-up.sh",
+    "e2e:down": "kind delete cluster --name kube-client-web",
     "lint": "biome check .",
     "format": "biome check --write ."
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.6",
+    "@types/node": "^24.0.0",
+    "@vitest/browser-playwright": "^5.1.0",
+    "playwright": "^1.65.0",
     "tsdown": "^0.23.7",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
