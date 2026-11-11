@@ -165,6 +165,39 @@ Things to know:
 - Objects in a list come without `apiVersion` and `kind`; the API server only
   sets them on single objects and watch events.
 
+## Connections that fail
+
+Watches and informers are built to run for hours in a tab, across network
+changes, a sleeping laptop and API server restarts.
+
+- **A lost connection** fails the open watch in Chromium and Firefox, and the
+  watch reconnects with increasing delays (`backoff`).
+- **A connection that died unnoticed** is the case to plan for: after the
+  machine slept, and in WebKit even after an API server restart, the browser
+  keeps the watch open although nothing will ever arrive. With
+  `timeoutSeconds` set, the server ends every watch by itself, so a watch
+  still open 30 seconds past that (`closeGraceMs`) is given up and replaced.
+  Informers always set it (`watchTimeoutSeconds`, five to ten minutes by
+  default). To find out sooner, set `idleTimeoutMs`; the API server normally
+  sends a bookmark about once a minute.
+- **Background tabs** have their timers slowed down by the browser, to once a
+  minute after a while. Events still arrive as they happen; only the delays
+  above get longer.
+- **Many watches** are fine. The API server speaks HTTP/2, so they share one
+  connection instead of running into the browser's limit of six per host. A
+  proxy in front of the API server has to speak HTTP/2 to the browser as well.
+
+## Browser support
+
+The end-to-end tests run in Chromium, Firefox and WebKit, including an API
+server restart and a token that stops working.
+
+One difference shows in WebKit, at least in the Linux build the tests use: a
+request the API server does not authenticate (no token, or one it rejects)
+fails with the browser's network error instead of an `ApiError` with status
+401 or 403. An informer treats both the same way: it reports the error, keeps
+trying, and carries on once the token function returns a valid token.
+
 ## Cluster requirements
 
 Browsers enforce restrictions that other clients do not, so the cluster has to
@@ -184,19 +217,21 @@ pnpm install
 pnpm lint && pnpm typecheck && pnpm test && pnpm build
 ```
 
-End-to-end tests run in Chromium against a local [kind](https://kind.sigs.k8s.io/) cluster:
+End-to-end tests run in Chromium, Firefox and WebKit against a local
+[kind](https://kind.sigs.k8s.io/) cluster:
 
 ```sh
 pnpm e2e:up      # create the cluster and the test identity
 pnpm test:e2e
+pnpm test:e2e:faults   # restarts the API server and revokes a token
 pnpm e2e:down
 ```
 
 ### Dev container
 
 The repository includes a [dev container](https://containers.dev/) with
-everything the commands above need: Node, pnpm, kind, kubectl, and Chromium
-with its system libraries. It is the same Ubuntu release and the same kind and
+everything the commands above need: Node, pnpm, kind, kubectl, and the three
+browsers with their system libraries. It is the same Ubuntu release and the same kind and
 kubectl versions as CI. The only requirement on the host is Docker.
 
 Open the folder in VS Code and run **Dev Containers: Reopen in Container**, or
@@ -207,7 +242,7 @@ devcontainer up --workspace-folder .
 devcontainer exec --workspace-folder . bash
 ```
 
-Creating the container installs the dependencies and Chromium. After that,
+Creating the container installs the dependencies and the browsers. After that,
 `pnpm e2e:up && pnpm test:e2e` works inside it.
 
 Things to know:
@@ -229,7 +264,8 @@ Things to know:
 ### Without the dev container
 
 Install Node (see `.node-version`), pnpm, Docker, kind and kubectl on the host,
-then install the browser once with `pnpm exec playwright install chromium`.
+then install the browsers once with
+`pnpm exec playwright install chromium firefox webkit`.
 
 ## Disclaimer
 
