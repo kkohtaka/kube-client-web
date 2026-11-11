@@ -8,7 +8,7 @@ import {
   type ReconnectInfo,
   type ResourceClient,
   type WatchEvent,
-  WatchIdleTimeoutError,
+  WatchTimeoutError,
 } from "./index.ts";
 
 interface ConfigMap extends KubeObject {
@@ -301,7 +301,7 @@ describe("watch", () => {
     expect(connection.signal.aborted).toBe(false);
 
     await vi.advanceTimersByTimeAsync(100);
-    expect(await second).toBeInstanceOf(WatchIdleTimeoutError);
+    expect(await second).toBeInstanceOf(WatchTimeoutError);
     expect(connection.signal.aborted).toBe(true);
   });
 
@@ -425,7 +425,7 @@ describe("watchWithReconnect", () => {
 
     (await server.connection(1)).send(added("a", "1"));
     expect((await first).value).toEqual(added("a", "1"));
-    expect(errors).toEqual([expect.any(WatchIdleTimeoutError)]);
+    expect(errors).toEqual([expect.any(WatchTimeoutError)]);
     await events.return();
   });
 
@@ -503,5 +503,56 @@ describe("watchWithReconnect", () => {
     expect(await first).toBe(reason);
     await vi.advanceTimersByTimeAsync(1000);
     expect(server.connections).toHaveLength(1);
+  });
+});
+
+describe("a connection the server should have ended", () => {
+  it("is given up once it is overdue", async () => {
+    vi.useFakeTimers();
+    const { server, resource } = setup();
+    const events = resource.watch({ timeoutSeconds: 10 });
+    const first = events.next();
+    const connection = await server.connection(0);
+    connection.send(added("a", "1"));
+    await first;
+
+    // Events do not push the moment the server is due to end the watch.
+    const second = events.next().catch((e: unknown) => e);
+    await vi.advanceTimersByTimeAsync(39_999);
+    expect(connection.signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await second).toBeInstanceOf(WatchTimeoutError);
+    expect(connection.signal.aborted).toBe(true);
+  });
+
+  it("waits as long past the timeout as closeGraceMs says", async () => {
+    vi.useFakeTimers();
+    const { server, resource } = setup();
+    const first = resource
+      .watch({ timeoutSeconds: 10, closeGraceMs: 500 })
+      .next()
+      .catch((e: unknown) => e);
+    await server.connection(0);
+    await vi.advanceTimersByTimeAsync(10_500);
+    expect(await first).toBeInstanceOf(WatchTimeoutError);
+  });
+
+  it("is replaced by a new one when reconnecting", async () => {
+    vi.useFakeTimers();
+    const { server, resource } = setup();
+    const events = resource.watchWithReconnect({
+      resourceVersion: "5",
+      timeoutSeconds: 10,
+      backoff: { initialDelayMs: 100, jitter: 0 },
+    });
+    const first = events.next();
+    await server.connection(0);
+    await vi.advanceTimersByTimeAsync(40_100);
+
+    const second = await server.connection(1);
+    expect(second.url.searchParams.get("resourceVersion")).toBe("5");
+    second.send(added("a", "6"));
+    expect((await first).value).toEqual(added("a", "6"));
+    await events.return();
   });
 });

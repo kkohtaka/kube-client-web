@@ -17,7 +17,11 @@ export interface InformerOptions {
    * Defaults to a random value between 300 and 600.
    */
   watchTimeoutSeconds?: number | undefined;
-  /** Reconnect when a watch connection stays silent for this long. Off by default. */
+  /**
+   * Reconnect when a watch connection stays silent for this long. Off by
+   * default; a dead connection is then noticed when the server fails to end
+   * the watch on time, 30 seconds after `watchTimeoutSeconds`.
+   */
   idleTimeoutMs?: number | undefined;
   /** Delays between attempts after a failure. */
   backoff?: BackoffOptions | undefined;
