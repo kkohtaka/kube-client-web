@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check that tool versions match the project
         run: |
           node_version="$(cat .node-version)"
@@ -40,7 +40,7 @@ jobs:
             { echo "::error::devcontainer.json does not install Node ${node_version} (.node-version)"; exit 1; }
           grep -Fq "\"pnpmVersion\": \"${pnpm_version}\"" .devcontainer/devcontainer.json ||
             { echo "::error::devcontainer.json does not install pnpm ${pnpm_version} (package.json)"; exit 1; }
-      - uses: devcontainers/ci@v0.3
+      - uses: devcontainers/ci@513af61f4de4f75d37e4438f184ba4358f0fc1ca # v0.3.1900000450
         with:
           push: never
           runCmd: pnpm e2e:up && pnpm test:e2e && pnpm test:demo && pnpm test:e2e:faults

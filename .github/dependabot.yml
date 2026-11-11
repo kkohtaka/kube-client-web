@@ -6,3 +6,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # Actions in .github/workflows are pinned to commits; the comment after each
+  # one names the release, and both are updated together.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

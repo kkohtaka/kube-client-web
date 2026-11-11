@@ -297,6 +297,10 @@ Publishing uses [npm trusted publishing](https://docs.npmjs.com/trusted-publishe
 the package on npmjs.com names this repository and `release.yml` as its
 trusted publisher, so no token is stored anywhere.
 
+## Security
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
 ## Disclaimer
 
 This is an unofficial project. It is not affiliated with or endorsed by the
