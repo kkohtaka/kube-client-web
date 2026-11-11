@@ -6,8 +6,9 @@
   --line: #dfe3ea;
   --panel: #f5f7fa;
   --accent: #2f6fde;
-  --ok: #1d8a4e;
-  --warn: #b26a00;
+  --on-accent: #ffffff;
+  --ok: #17753f;
+  --warn: #9a5b00;
   --bad: #c0392b;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 15px;
@@ -22,6 +23,7 @@
     --line: #2a313c;
     --panel: #1a2029;
     --accent: #6ea2ff;
+    --on-accent: #0b1220;
     --ok: #4fc47f;
     --warn: #e0a84a;
     --bad: #f0796b;
@@ -75,6 +77,9 @@ code {
 
 .views {
   display: inline-flex;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: hidden;
@@ -100,9 +105,18 @@ button:hover {
   background: transparent;
 }
 
-.views button[aria-selected="true"] {
+.views button[aria-pressed="true"] {
   background: var(--accent);
-  color: #ffffff;
+  color: var(--on-accent);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 #create {
@@ -197,8 +211,6 @@ tr.flash td {
   list-style: none;
   margin: 0 0 48px;
   padding: 8px 12px;
-  max-height: 240px;
-  overflow: auto;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;

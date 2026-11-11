@@ -41,12 +41,14 @@
     "test:e2e:faults": "vitest run --project faults-chromium && vitest run --project faults-firefox && vitest run --project faults-webkit",
     "test:demo": "vitest run --project demo",
     "demo": "vite --config examples/demo/vite.config.ts",
+    "demo:build": "vite build --config examples/demo/vite.config.ts",
     "e2e:up": "./e2e/cluster-up.sh",
     "e2e:down": "kind delete cluster --name kube-client-web",
     "lint": "biome check .",
     "format": "biome check --write ."
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@biomejs/biome": "2.6.6",
     "@types/node": "^24.0.0",
     "@vitest/browser-playwright": "^5.1.0",

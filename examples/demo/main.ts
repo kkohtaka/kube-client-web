@@ -117,7 +117,8 @@ function log(kind: string, text: string): void {
   time.textContent = new Date().toLocaleTimeString();
   item.append(time, `${kind} ${text}`);
   logElement.prepend(item);
-  while (logElement.children.length > 100) {
+  // Short enough to stay on the page without a scrolling box of its own.
+  while (logElement.children.length > 30) {
     logElement.lastElementChild?.remove();
   }
 }
@@ -252,7 +253,7 @@ function show<T extends Resource>(view: View<T>): void {
 
 function select(name: keyof typeof views): void {
   for (const button of viewsElement.querySelectorAll("button")) {
-    button.setAttribute("aria-selected", String(button.dataset.view === name));
+    button.setAttribute("aria-pressed", String(button.dataset.view === name));
   }
   if (name === "configmaps") {
     show(views.configmaps);
@@ -264,7 +265,6 @@ function select(name: keyof typeof views): void {
 for (const name of Object.keys(views) as (keyof typeof views)[]) {
   const button = document.createElement("button");
   button.type = "button";
-  button.role = "tab";
   button.dataset.view = name;
   button.dataset.testid = `view-${name}`;
   button.textContent = views[name].label;

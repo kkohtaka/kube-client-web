@@ -17,8 +17,12 @@
 
     <main>
       <section class="toolbar">
-        <div class="views" role="tablist" id="views"></div>
-        <span class="status" id="status" data-testid="status" data-state="connecting">Connecting</span>
+        <fieldset class="views" id="views">
+          <legend class="visually-hidden">Resource</legend>
+        </fieldset>
+        <span class="status" id="status" role="status" data-testid="status" data-state="connecting"
+          >Connecting</span
+        >
         <span class="count" id="count" data-testid="count"></span>
         <button type="button" id="create" data-testid="create">Create a ConfigMap</button>
       </section>
@@ -31,7 +35,7 @@
             <th id="detail-heading">Details</th>
             <th>Created</th>
             <th>Version</th>
-            <th></th>
+            <th><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
