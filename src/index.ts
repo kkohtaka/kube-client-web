@@ -1,9 +1,36 @@
-/**
- * Joins an API server base URL and a resource path into a request URL.
- *
- * A base URL may carry a path prefix (for example when the API server is
- * reached through a reverse proxy), so the prefix is preserved.
- */
-export function joinUrl(baseUrl: string, path: string): string {
-  return `${baseUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
-}
+export {
+  type ClientConfig,
+  createClient,
+  KubeClient,
+  type QueryValue,
+  type RequestOptions,
+  type TokenSource,
+} from "./client.ts";
+export { ApiError } from "./errors.ts";
+export {
+  defineResource,
+  type ResourceDescriptor,
+  type ResourcePathOptions,
+  resourcePath,
+} from "./resource.ts";
+export {
+  type ApplyOptions,
+  type CreateOptions,
+  type DeleteOptions,
+  type GetOptions,
+  type ListOptions,
+  type PatchOptions,
+  type PatchType,
+  ResourceClient,
+  type UpdateOptions,
+} from "./resource-client.ts";
+export type {
+  KubeList,
+  KubeObject,
+  ListMeta,
+  ObjectMeta,
+  OwnerReference,
+  Status,
+  StatusCause,
+  StatusDetails,
+} from "./types.ts";
