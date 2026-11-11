@@ -128,14 +128,20 @@ describe("watching from the browser", () => {
     // The custom resource was registered long after the cluster started, so
     // the server no longer has the history back to version 1 for it. For
     // built-in resources of a fresh cluster it still does.
-    const events = client().resource(widgets).watch({
-      namespace,
-      resourceVersion: "1",
-      timeoutSeconds: 5,
-      signal: untilTestEnds(),
-    });
-    const error = await events.next().catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(ApiError);
+    const signal = untilTestEnds();
+    let error: unknown;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      error = await client()
+        .resource(widgets)
+        .watch({ namespace, resourceVersion: "1", timeoutSeconds: 5, signal })
+        .next()
+        .catch((e: unknown) => e);
+      // The server answers 429 while it is still loading a resource it has not served yet.
+      if (!(error instanceof ApiError && error.status === 429)) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
     expect(error).toMatchObject({ status: 410, reason: "Expired" });
     expect(isGone(error)).toBe(true);
   });
