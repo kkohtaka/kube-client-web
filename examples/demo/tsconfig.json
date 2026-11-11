@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "isolatedDeclarations": false,
+    "declaration": false,
+    "paths": {
+      "kube-client-web": ["../../src/index.ts"]
+    }
+  },
+  "include": ["."]
+}

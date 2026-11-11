@@ -165,6 +165,12 @@ Things to know:
 - Objects in a list come without `apiVersion` and `kind`; the API server only
   sets them on single objects and watch events.
 
+## Demo
+
+[`examples/demo`](examples/demo) is a small page that shows a live view of a
+cluster with an informer. See its README for how to run it against a local
+kind cluster.
+
 ## Connections that fail
 
 Watches and informers are built to run for hours in a tab, across network
