@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { AxeBuilder } from "@axe-core/playwright";
 import { type Browser, chromium, type Page } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -39,6 +40,23 @@ async function screenshot(name: string): Promise<void> {
   });
 }
 
+/** Checks the page as it is now for accessibility problems, in both color schemes. */
+async function expectAccessible(): Promise<void> {
+  // Rows flash when they change; judge the colors they settle on.
+  await page.evaluate(() =>
+    Promise.all(document.getAnimations().map((animation) => animation.finished)),
+  );
+  for (const colorScheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme });
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect(
+      violations.map(({ id, help, nodes }) => ({ id, help, nodes: nodes.map((n) => n.html) })),
+      `accessibility in the ${colorScheme} color scheme`,
+    ).toEqual([]);
+  }
+  await page.emulateMedia({ colorScheme: "light" });
+}
+
 function row(name: string, inNamespace = namespace) {
   return page.locator(`tr[data-key="${inNamespace}/${name}"]`);
 }
@@ -75,6 +93,7 @@ describe("the demo page", () => {
     await page.locator(`tr[data-key="${key}"]`).waitFor({ state: "detached" });
     expect(await page.getByTestId("log").textContent()).toContain(`delete ${key}`);
     await screenshot("configmaps");
+    await expectAccessible();
   });
 
   it("switches to Pods across all namespaces", async () => {
@@ -86,5 +105,6 @@ describe("the demo page", () => {
     expect(await page.getByTestId("create").isHidden()).toBe(true);
     expect(await page.getByTestId("delete").count()).toBe(0);
     await screenshot("pods");
+    await expectAccessible();
   });
 });

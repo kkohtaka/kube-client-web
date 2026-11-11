@@ -40,7 +40,19 @@ function tokenEndpoint(): Plugin {
   };
 }
 
-export default defineConfig(async () => {
+export default defineConfig(async ({ command }) => {
+  const shared = {
+    root: import.meta.dirname,
+    resolve: {
+      // Lets the demo import the library by name, as an application would.
+      alias: { "kube-client-web": resolve(import.meta.dirname, "../../src/index.ts") },
+    },
+  };
+  if (command === "build") {
+    // Building only checks that the page bundles; it needs no cluster.
+    return shared;
+  }
+
   const apiServer = await kubectl(
     "config",
     "view",
@@ -53,11 +65,7 @@ export default defineConfig(async () => {
     });
   });
   return {
-    root: import.meta.dirname,
-    resolve: {
-      // Lets the demo import the library by name, as an application would.
-      alias: { "kube-client-web": resolve(import.meta.dirname, "../../src/index.ts") },
-    },
+    ...shared,
     plugins: [tokenEndpoint()],
     server: {
       proxy: {
