@@ -1,7 +1,10 @@
 name: CI
 
 # Branches of this repository are checked when they are pushed. Pull requests
-# from forks never push here, so those are checked as pull requests.
+# from forks never push here, so those are checked as pull requests. So is the
+# "Version Packages" pull request: the Release workflow pushes its branch, and
+# pushes made by a workflow do not start other workflows. GitHub holds the run
+# for that pull request until a maintainer approves it.
 on:
   push:
   pull_request:
@@ -15,7 +18,7 @@ concurrency:
 
 jobs:
   check:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || github.head_ref == 'changeset-release/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -33,7 +36,7 @@ jobs:
       - run: pnpm demo:build
 
   e2e:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || github.head_ref == 'changeset-release/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
