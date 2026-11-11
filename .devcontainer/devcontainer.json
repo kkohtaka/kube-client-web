@@ -3,7 +3,7 @@
   "build": { "dockerfile": "Dockerfile" },
   "features": {
     // Keep in sync with .node-version and "packageManager" in package.json.
-    "ghcr.io/devcontainers/features/node:1": {
+    "ghcr.io/devcontainers/features/node:2": {
       "version": "24",
       "pnpmVersion": "12.18.0"
     },
