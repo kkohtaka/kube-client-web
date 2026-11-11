@@ -78,6 +78,27 @@ describe("errors from the browser", () => {
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
     expect([401, 403]).toContain((error as ApiError).status);
+    console.log("DIAG anonymous status", (error as ApiError).status);
+  });
+
+  it("is rejected with a token the server does not accept", async () => {
+    const stranger = createClient({ baseUrl: inject("apiServer"), token: "not-a-valid-token" });
+    const error = await stranger
+      .resource(pods)
+      .list({ namespace: "kube-system" })
+      .catch((e: unknown) => e);
+    expect(error).toMatchObject({ status: 401, reason: "Unauthorized" });
+  });
+
+  it("DIAG raw anonymous fetch", async () => {
+    for (const init of [{}, { headers: { "X-Force-Preflight": "1" } }, { credentials: "omit" as const }]) {
+      try {
+        const response = await fetch(`${inject("apiServer")}/api/v1/namespaces/kube-system/pods`, init);
+        console.log("DIAG raw", JSON.stringify(init), response.status, JSON.stringify([...response.headers]));
+      } catch (error) {
+        console.log("DIAG raw", JSON.stringify(init), "failed:", String(error));
+      }
+    }
   });
 
   it("is forbidden from writing outside the test namespace", async () => {

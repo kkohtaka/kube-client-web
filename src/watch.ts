@@ -151,7 +151,11 @@ export async function* watchOnce<T extends KubeObject>(
       }
     }
   } catch (error) {
-    // Not every fetch implementation rejects with the reason it was aborted with.
+    // Not every fetch implementation rejects with the reason it was aborted
+    // with; WebKit fails a body that is being read with an error of its own.
+    if (signal?.aborted) {
+      throw signal.reason;
+    }
     if (teardown.signal.reason instanceof WatchTimeoutError) {
       throw teardown.signal.reason;
     }
