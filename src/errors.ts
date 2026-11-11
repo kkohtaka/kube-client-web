@@ -25,3 +25,12 @@ export class ApiError extends Error {
     return this.body?.reason;
   }
 }
+
+/**
+ * Whether the error says the requested resource version is no longer
+ * available (HTTP 410). A list continuation or a watch that fails this way
+ * has to start over from a fresh list.
+ */
+export function isGone(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.status === 410;
+}

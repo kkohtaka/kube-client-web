@@ -1,6 +1,13 @@
 import type { KubeClient, QueryValue } from "./client.ts";
 import { type ResourceDescriptor, resourcePath } from "./resource.ts";
 import type { KubeList, KubeObject, Status } from "./types.ts";
+import {
+  type ReconnectingWatchOptions,
+  type WatchEvent,
+  type WatchOptions,
+  watchOnce,
+  watchWithReconnect,
+} from "./watch.ts";
 
 interface Cancellable {
   signal?: AbortSignal | undefined;
@@ -212,6 +219,35 @@ export class ResourceClient<T extends KubeObject> {
       body: hasBody ? { apiVersion: "v1", kind: "DeleteOptions", ...body } : undefined,
       signal,
     });
+  }
+
+  /**
+   * Opens a single watch connection and yields changes as they arrive. The
+   * iteration ends when the server closes the connection, which it does
+   * regularly; use {@link watchWithReconnect} to keep watching.
+   *
+   * A watch the server cannot serve throws an `ApiError`. Status 410 means
+   * `resourceVersion` is too old: list again and watch from the new version.
+   * Stop watching by leaving the loop or aborting `signal`.
+   */
+  watch(options: WatchOptions = {}): AsyncGenerator<WatchEvent<T>, void, undefined> {
+    const { namespace, ...rest } = options;
+    return watchOnce<T>(this.#client, this.#path({ namespace }), rest);
+  }
+
+  /**
+   * Watches without end: when a connection closes or fails, connects again
+   * from the last version seen, waiting longer after repeated failures.
+   *
+   * The iteration only ends by throwing: when `signal` aborts, or with the
+   * `ApiError` of an answer that retrying cannot change. That includes status
+   * 410 (see {@link isGone}), after which the caller has to list again.
+   */
+  watchWithReconnect(
+    options: ReconnectingWatchOptions = {},
+  ): AsyncGenerator<WatchEvent<T>, void, undefined> {
+    const { namespace, ...rest } = options;
+    return watchWithReconnect<T>(this.#client, this.#path({ namespace }), rest);
   }
 
   #path(options: {

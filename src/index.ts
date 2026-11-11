@@ -1,3 +1,4 @@
+export type { BackoffOptions } from "./backoff.ts";
 export {
   type ClientConfig,
   createClient,
@@ -6,7 +7,7 @@ export {
   type RequestOptions,
   type TokenSource,
 } from "./client.ts";
-export { ApiError } from "./errors.ts";
+export { ApiError, isGone } from "./errors.ts";
 export {
   defineResource,
   type ResourceDescriptor,
@@ -34,3 +35,10 @@ export type {
   StatusCause,
   StatusDetails,
 } from "./types.ts";
+export {
+  type ReconnectInfo,
+  type ReconnectingWatchOptions,
+  type WatchEvent,
+  WatchIdleTimeoutError,
+  type WatchOptions,
+} from "./watch.ts";
