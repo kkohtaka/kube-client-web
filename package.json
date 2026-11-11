@@ -4,6 +4,8 @@
   "description": "Kubernetes client library for the browser with informer support",
   "license": "Apache-2.0",
   "author": "Kazumasa Kohtaka <kkohtaka@gmail.com>",
+  "homepage": "https://github.com/kkohtaka/kube-client-web#readme",
+  "bugs": "https://github.com/kkohtaka/kube-client-web/issues",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/kkohtaka/kube-client-web.git"
@@ -26,14 +28,15 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
-  "engines": {
-    "node": ">=24"
-  },
   "packageManager": "pnpm@12.18.0",
   "scripts": {
     "build": "tsdown",
+    "prepack": "tsdown",
+    "check:package": "publint --strict && attw --pack . --profile esm-only",
+    "changeset": "changeset",
     "typecheck": "tsc --noEmit && tsc --noEmit -p e2e && tsc --noEmit -p examples/demo",
     "test": "vitest run --project unit",
     "test:watch": "vitest --project unit",
@@ -48,11 +51,14 @@
     "format": "biome check --write ."
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.5",
     "@axe-core/playwright": "^4.14.0",
     "@biomejs/biome": "2.6.6",
+    "@changesets/cli": "^3.0.3",
     "@types/node": "^24.0.0",
     "@vitest/browser-playwright": "^5.1.0",
     "playwright": "^1.65.0",
+    "publint": "^0.3.25",
     "tsdown": "^0.23.7",
     "typescript": "^7.0.2",
     "vite": "^8.3.7",
