@@ -1,0 +1,49 @@
+{
+  "name": "kube-client-web",
+  "version": "0.0.0",
+  "description": "Kubernetes client library for the browser with informer support",
+  "license": "Apache-2.0",
+  "author": "Kazumasa Kohtaka <kkohtaka@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kkohtaka/kube-client-web.git"
+  },
+  "keywords": [
+    "kubernetes",
+    "k8s",
+    "client",
+    "browser",
+    "informer",
+    "watch"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@12.18.0",
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.6",
+    "tsdown": "^0.23.7",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
