@@ -2,14 +2,21 @@
 
 A Kubernetes client library for the browser, with informer support.
 
-> **Status:** early development. Nothing is published yet and the API is not stable.
-> REST operations, watch and informers work today.
+> **Status:** early. The API may still change between minor versions before 1.0.
 
 ## Goals
 
 - Talk to a Kubernetes API server directly from the browser using `fetch`.
 - Provide informers (list + watch with a local cache), not just REST calls.
 - Ship as ESM with TypeScript types and no runtime dependencies.
+
+## Install
+
+```sh
+npm install kube-client-web
+```
+
+The package is ESM only, ships its TypeScript types and has no dependencies.
 
 ## Usage
 
@@ -272,6 +279,23 @@ Things to know:
 Install Node (see `.node-version`), pnpm, Docker, kind and kubectl on the host,
 then install the browsers once with
 `pnpm exec playwright install chromium firefox webkit`.
+
+### Releasing
+
+Releases are driven by [Changesets](https://changesets.dev/).
+
+- A pull request that changes what users of the package get adds a changeset:
+  run `pnpm changeset`, pick the kind of change and describe it in a sentence
+  for the changelog. Changes to tests, CI or the demo need none.
+- While changesets are waiting on `main`, the Release workflow keeps a
+  "Version Packages" pull request up to date. It bumps the version and moves
+  the changesets into `CHANGELOG.md`.
+- Merging that pull request publishes the new version to npm, tags it and
+  creates a GitHub release.
+
+Publishing uses [npm trusted publishing](https://docs.npmjs.com/trusted-publishers):
+the package on npmjs.com names this repository and `release.yml` as its
+trusted publisher, so no token is stored anywhere.
 
 ## Disclaimer
 
