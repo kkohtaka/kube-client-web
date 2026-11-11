@@ -34,6 +34,16 @@ export default defineConfig({
           browser: browser(...browsers),
         },
       },
+      {
+        // Opens the demo page in a browser, against the kind cluster.
+        test: {
+          name: "demo",
+          include: ["examples/demo/*.test.ts"],
+          environment: "node",
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
+        },
+      },
       // Tests that break the cluster on purpose. They would disturb the other
       // tests and each other, so each browser gets a project of its own and
       // the test:e2e:faults script runs them one after the other.

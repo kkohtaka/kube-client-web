@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>kube-client-web demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>kube-client-web demo</h1>
+      <p>
+        A live view of a cluster, kept up to date by an informer. Change something with
+        <code>kubectl</code> and watch it appear here.
+      </p>
+    </header>
+
+    <main>
+      <section class="toolbar">
+        <div class="views" role="tablist" id="views"></div>
+        <span class="status" id="status" data-testid="status" data-state="connecting">Connecting</span>
+        <span class="count" id="count" data-testid="count"></span>
+        <button type="button" id="create" data-testid="create">Create a ConfigMap</button>
+      </section>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Namespace</th>
+            <th>Name</th>
+            <th id="detail-heading">Details</th>
+            <th>Created</th>
+            <th>Version</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p class="empty" id="empty" hidden>Nothing here yet.</p>
+
+      <section>
+        <h2>Events</h2>
+        <ol class="log" id="log" data-testid="log"></ol>
+      </section>
+    </main>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
