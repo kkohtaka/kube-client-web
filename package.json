@@ -1,6 +1,6 @@
 {
   "name": "kube-client-web",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Kubernetes client library for the browser with informer support",
   "license": "Apache-2.0",
   "author": "Kazumasa Kohtaka <kkohtaka@gmail.com>",
