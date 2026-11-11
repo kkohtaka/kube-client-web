@@ -106,22 +106,6 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 End-to-end tests run in Chromium against a local [kind](https://kind.sigs.k8s.io/) cluster:
 
 ```sh
-pnpm exec playwright install chromium
-pnpm e2e:up      # create the cluster and test fixtures
-pnpm test:e2e
-pnpm e2e:down
-```
-
-## Development
-
-```sh
-pnpm install
-pnpm lint && pnpm typecheck && pnpm test && pnpm build
-```
-
-End-to-end tests run in Chromium against a local [kind](https://kind.sigs.k8s.io/) cluster:
-
-```sh
 pnpm e2e:up      # create the cluster and the test identity
 pnpm test:e2e
 pnpm e2e:down
