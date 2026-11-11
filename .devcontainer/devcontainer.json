@@ -1,0 +1,30 @@
+{
+  "name": "kube-client-web",
+  "build": { "dockerfile": "Dockerfile" },
+  "features": {
+    // Keep in sync with .node-version and "packageManager" in package.json.
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "24",
+      "pnpmVersion": "12.18.0"
+    },
+    // A Docker daemon private to this container. kind creates its cluster in
+    // it, so the API server's 127.0.0.1:6443 is this container's loopback and
+    // kubectl, Vitest and Chromium reach it exactly as they do in CI.
+    // This feature runs the container privileged.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+  "remoteUser": "vscode",
+  // Chromium needs more shared memory than Docker's 64 MB default.
+  "runArgs": ["--shm-size=1g"],
+  "mounts": [
+    // Linux builds of native dependencies, kept apart from the host's node_modules.
+    "source=kube-client-web-node-modules-${devcontainerId},target=${containerWorkspaceFolder}/node_modules,type=volume",
+    // Claude Code sign-in, settings and history survive container rebuilds.
+    "source=kube-client-web-claude-${devcontainerId},target=/home/vscode/.claude,type=volume"
+  ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+  },
+  "postCreateCommand": ".devcontainer/post-create.sh"
+}
