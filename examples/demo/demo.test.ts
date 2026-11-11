@@ -19,7 +19,7 @@ beforeAll(async () => {
     throw new Error("the dev server did not report its address");
   }
   browser = await chromium.launch();
-  page = await browser.newPage();
+  page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
   await page.goto(url);
 });
 
@@ -30,6 +30,14 @@ afterAll(async () => {
     await kubectl("-n", namespace, "delete", "configmap", name, "--ignore-not-found");
   }
 });
+
+/** Saved for a look at the page; CI keeps them as an artifact. */
+async function screenshot(name: string): Promise<void> {
+  await page.screenshot({
+    path: resolve(import.meta.dirname, "screenshots", `${name}.png`),
+    fullPage: true,
+  });
+}
 
 function row(name: string, inNamespace = namespace) {
   return page.locator(`tr[data-key="${inNamespace}/${name}"]`);
@@ -66,6 +74,7 @@ describe("the demo page", () => {
     await created.getByTestId("delete").click();
     await page.locator(`tr[data-key="${key}"]`).waitFor({ state: "detached" });
     expect(await page.getByTestId("log").textContent()).toContain(`delete ${key}`);
+    await screenshot("configmaps");
   });
 
   it("switches to Pods across all namespaces", async () => {
@@ -76,5 +85,6 @@ describe("the demo page", () => {
     // Pods are read-only in the demo.
     expect(await page.getByTestId("create").isHidden()).toBe(true);
     expect(await page.getByTestId("delete").count()).toBe(0);
+    await screenshot("pods");
   });
 });
