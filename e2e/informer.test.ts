@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { type ConfigMap, client, configMaps, namespace, uniqueName } from "./fixtures.ts";
+import {
+  type ConfigMap,
+  client,
+  configMaps,
+  eventually,
+  namespace,
+  uniqueName,
+} from "./fixtures.ts";
 
 const cleanups: (() => unknown)[] = [];
 
@@ -24,17 +31,6 @@ function isolate(): { labels: Record<string, string>; labelSelector: string } {
 
 function track(name: string): void {
   cleanups.push(() => client().resource(configMaps).delete(name, { namespace }));
-}
-
-/** Polls until the condition holds, so a failure names the state that was never reached. */
-async function eventually(condition: () => boolean, what: string): Promise<void> {
-  const deadline = performance.now() + 10_000;
-  while (!condition()) {
-    if (performance.now() > deadline) {
-      throw new Error(`timed out waiting for ${what}`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
 }
 
 describe("informers in the browser", () => {
