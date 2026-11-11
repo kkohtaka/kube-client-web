@@ -11,7 +11,7 @@
     // it, so the API server's 127.0.0.1:6443 is this container's loopback and
     // kubectl, Vitest and Chromium reach it exactly as they do in CI.
     // This feature runs the container privileged.
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {},
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
   "remoteUser": "vscode",

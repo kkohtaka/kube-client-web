@@ -1,8 +1,8 @@
-# Ubuntu 24.04 is what GitHub Actions' ubuntu-latest runs, so the e2e tests see
+# Ubuntu 26.04 is what GitHub Actions' ubuntu-latest runs, so the e2e tests see
 # the same distribution and browser dependencies locally and in CI.
-FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04
+FROM mcr.microsoft.com/devcontainers/base:ubuntu26.04
 
-# Same versions as the ubuntu-24.04 runner image, pinned by checksum.
+# Same versions as the ubuntu-26.04 runner image, pinned by checksum.
 # TARGETARCH is amd64 or arm64 (Apple Silicon).
 ARG TARGETARCH
 ARG KIND_VERSION=v0.33.0
