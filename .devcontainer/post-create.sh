@@ -23,4 +23,4 @@ fi
 # that `pnpm e2e:up` starts from a clean state.
 kind delete clusters --all
 
-pnpm exec playwright install --with-deps chromium
+pnpm exec playwright install --with-deps chromium firefox webkit

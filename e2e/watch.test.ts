@@ -146,6 +146,21 @@ describe("watching from the browser", () => {
     expect(isGone(error)).toBe(true);
   });
 
+  it("gives up with 410 Gone instead of reconnecting forever", async () => {
+    // The reconnecting watch waits out the 429 of a resource that is still loading.
+    const events = client()
+      .resource(widgets)
+      .watchWithReconnect({
+        namespace,
+        resourceVersion: "1",
+        timeoutSeconds: 5,
+        backoff: { initialDelayMs: 100, maxDelayMs: 500 },
+        signal: untilTestEnds(),
+      });
+    const error = await events.next().catch((e: unknown) => e);
+    expect(error).toMatchObject({ status: 410, reason: "Expired" });
+  });
+
   it("is refused without permission", async () => {
     // Outside its own namespace the test identity can view everything except Secrets.
     const secrets = defineResource({ version: "v1", resource: "secrets", namespaced: true });

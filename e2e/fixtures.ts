@@ -61,3 +61,18 @@ export const widgets = defineResource<Widget>({
   resource: "widgets",
   namespaced: true,
 });
+
+/** Polls until the condition holds, so a failure names the state that was never reached. */
+export async function eventually(
+  condition: () => boolean,
+  what: string,
+  timeoutMs = 10_000,
+): Promise<void> {
+  const deadline = performance.now() + timeoutMs;
+  while (!condition()) {
+    if (performance.now() > deadline) {
+      throw new Error(`timed out waiting for ${what}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
