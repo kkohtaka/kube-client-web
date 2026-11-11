@@ -20,7 +20,9 @@ beforeAll(async () => {
     throw new Error("the dev server did not report its address");
   }
   browser = await chromium.launch();
-  page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
+  // axe opens a page of its own, which needs an explicit context.
+  const context = await browser.newContext({ viewport: { width: 1100, height: 800 } });
+  page = await context.newPage();
   await page.goto(url);
 });
 
