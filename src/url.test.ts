@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { joinUrl } from "./index.ts";
+import { joinUrl } from "./url.ts";
 
 describe("joinUrl", () => {
   it("joins a base URL and a path", () => {
