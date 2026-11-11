@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Dev container features in .devcontainer/devcontainer.json and its lockfile.
+  # kind and kubectl are pinned in .devcontainer/Dockerfile and updated by hand.
+  - package-ecosystem: devcontainers
+    directory: /
+    schedule:
+      interval: weekly
