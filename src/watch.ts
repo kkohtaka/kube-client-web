@@ -95,9 +95,25 @@ export async function* watchOnce<T extends KubeObject>(
   const teardown = new AbortController();
   const requestSignal = signal ? AbortSignal.any([signal, teardown.signal]) : teardown.signal;
 
+  // Aborting a request should fail whatever is waiting on it, but that cannot
+  // be relied on: WebKit leaves a read on a connection that died pending
+  // forever. So every wait also ends by itself when the request is aborted.
+  const aborted = new Promise<never>((_, reject) => {
+    const fail = (): void => reject(requestSignal.reason);
+    if (requestSignal.aborted) {
+      fail();
+    } else {
+      requestSignal.addEventListener("abort", fail, { once: true });
+    }
+  });
+  aborted.catch(() => undefined);
+
   // The timer only runs while waiting for the server, so a slow consumer does
   // not trip it.
-  async function waitFor<R>(promise: Promise<R>): Promise<R> {
+  async function waitFor<R>(pending: Promise<R>): Promise<R> {
+    // Whatever becomes of a wait that was given up on is of no interest.
+    pending.catch(() => undefined);
+    const promise = Promise.race([pending, aborted]);
     const untilOverdue = overdueAt - Date.now();
     const idle = idleTimeoutMs ?? Number.POSITIVE_INFINITY;
     const delay = Math.min(idle, untilOverdue);
