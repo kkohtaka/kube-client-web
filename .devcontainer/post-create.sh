@@ -18,4 +18,9 @@ if ! timeout 60 sh -c 'until docker info >/dev/null 2>&1; do sleep 1; done'; the
   exit 1
 fi
 
+# The daemon's data lives in a volume that outlives the container, but the
+# kubeconfig does not. Remove clusters left behind by a previous container so
+# that `pnpm e2e:up` starts from a clean state.
+kind delete clusters --all
+
 pnpm exec playwright install --with-deps chromium
