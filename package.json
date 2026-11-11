@@ -38,7 +38,7 @@
     "test": "vitest run --project unit",
     "test:watch": "vitest --project unit",
     "test:e2e": "vitest run --project e2e",
-    "test:e2e:faults": "vitest run --project 'faults (chromium)' && vitest run --project 'faults (firefox)' && vitest run --project 'faults (webkit)'",
+    "test:e2e:faults": "vitest run --project faults-chromium && vitest run --project faults-firefox && vitest run --project faults-webkit",
     "e2e:up": "./e2e/cluster-up.sh",
     "e2e:down": "kind delete cluster --name kube-client-web",
     "lint": "biome check .",
