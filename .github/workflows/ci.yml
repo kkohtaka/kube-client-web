@@ -20,6 +20,7 @@ jobs:
   check:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || github.head_ref == 'changeset-release/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -38,6 +39,7 @@ jobs:
   e2e:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository || github.head_ref == 'changeset-release/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6

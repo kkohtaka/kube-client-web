@@ -20,6 +20,7 @@ concurrency:
 jobs:
   select-mode:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       mode: ${{ steps.select-mode.outputs.mode }}
       publish-plan-artifact-id: ${{ steps.select-mode.outputs.publish-plan-artifact-id }}
@@ -42,6 +43,7 @@ jobs:
     if: needs.select-mode.outputs.mode == 'version'
     needs: select-mode
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write # commit the version changes
       pull-requests: write # open the pull request
@@ -65,6 +67,7 @@ jobs:
     if: needs.select-mode.outputs.mode == 'publish'
     needs: select-mode
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     outputs:
       pack-dir-artifact-id: ${{ steps.pack.outputs.pack-dir-artifact-id }}
     permissions:
@@ -89,6 +92,7 @@ jobs:
   publish:
     needs: pack
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write # create the tag and the GitHub release
       id-token: write # npm trusted publishing; granted to this job only
