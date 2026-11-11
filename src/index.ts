@@ -40,6 +40,6 @@ export {
   type ReconnectInfo,
   type ReconnectingWatchOptions,
   type WatchEvent,
-  WatchIdleTimeoutError,
   type WatchOptions,
+  WatchTimeoutError,
 } from "./watch.ts";

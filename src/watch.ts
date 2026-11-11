@@ -25,13 +25,23 @@ export interface WatchOptions {
   resourceVersion?: string | undefined;
   /** Ask the server for periodic `BOOKMARK` events. Defaults to `true`. */
   allowWatchBookmarks?: boolean | undefined;
-  /** Ask the server to end the watch after this many seconds. */
+  /**
+   * Ask the server to end the watch after this many seconds. If the connection
+   * is still open `closeGraceMs` after that, it is taken for dead and the watch
+   * gives up with a {@link WatchTimeoutError}.
+   */
   timeoutSeconds?: number | undefined;
   /**
-   * Give up with a {@link WatchIdleTimeoutError} when the server sends nothing
+   * How long past `timeoutSeconds` to wait for the server to end the watch.
+   * Defaults to 30000.
+   */
+  closeGraceMs?: number | undefined;
+  /**
+   * Give up with a {@link WatchTimeoutError} when the server sends nothing
    * for this long. Guards against connections that died without the browser
-   * noticing, for example after the machine slept. With bookmarks enabled the
-   * API server normally sends something about once a minute.
+   * noticing, for example after the machine slept, sooner than
+   * `timeoutSeconds` does. With bookmarks enabled the API server normally
+   * sends something about once a minute.
    */
   idleTimeoutMs?: number | undefined;
   signal?: AbortSignal | undefined;
@@ -52,13 +62,12 @@ export interface ReconnectingWatchOptions extends WatchOptions {
   onReconnect?: ((info: ReconnectInfo) => void) | undefined;
 }
 
-/** Thrown by a watch when nothing arrived within `idleTimeoutMs`. */
-export class WatchIdleTimeoutError extends Error {
-  override readonly name: string = "WatchIdleTimeoutError";
-
-  constructor(idleTimeoutMs: number) {
-    super(`the watch received nothing for ${idleTimeoutMs} ms`);
-  }
+/**
+ * Thrown by a watch whose connection looks dead: nothing arrived within
+ * `idleTimeoutMs`, or the server did not end the watch when it was asked to.
+ */
+export class WatchTimeoutError extends Error {
+  override readonly name: string = "WatchTimeoutError";
 }
 
 /** Runs one watch request and yields its events until the server ends it. */
@@ -67,22 +76,41 @@ export async function* watchOnce<T extends KubeObject>(
   path: string,
   options: Omit<WatchOptions, "namespace">,
 ): AsyncGenerator<WatchEvent<T>, void, undefined> {
-  const { signal, idleTimeoutMs, allowWatchBookmarks = true, ...query } = options;
+  const {
+    signal,
+    idleTimeoutMs,
+    closeGraceMs = 30_000,
+    allowWatchBookmarks = true,
+    ...query
+  } = options;
+  // The server ends the watch by itself after timeoutSeconds. A connection
+  // that outlives that has died without the browser noticing.
+  const overdueAt =
+    query.timeoutSeconds === undefined
+      ? Number.POSITIVE_INFINITY
+      : Date.now() + query.timeoutSeconds * 1000 + closeGraceMs;
 
   // Aborting this controller is how the request is torn down, both by the
-  // idle timer and when the consumer stops iterating.
+  // timers and when the consumer stops iterating.
   const teardown = new AbortController();
   const requestSignal = signal ? AbortSignal.any([signal, teardown.signal]) : teardown.signal;
 
   // The timer only runs while waiting for the server, so a slow consumer does
   // not trip it.
   async function waitFor<R>(promise: Promise<R>): Promise<R> {
-    if (idleTimeoutMs === undefined) {
+    const untilOverdue = overdueAt - Date.now();
+    const idle = idleTimeoutMs ?? Number.POSITIVE_INFINITY;
+    const delay = Math.min(idle, untilOverdue);
+    if (delay === Number.POSITIVE_INFINITY) {
       return promise;
     }
+    const message =
+      idle <= untilOverdue
+        ? `the watch received nothing for ${idle} ms`
+        : "the server did not end the watch when it was due";
     const timer = setTimeout(
-      () => teardown.abort(new WatchIdleTimeoutError(idleTimeoutMs)),
-      idleTimeoutMs,
+      () => teardown.abort(new WatchTimeoutError(message)),
+      Math.max(delay, 0),
     );
     try {
       return await promise;
@@ -124,7 +152,7 @@ export async function* watchOnce<T extends KubeObject>(
     }
   } catch (error) {
     // Not every fetch implementation rejects with the reason it was aborted with.
-    if (teardown.signal.reason instanceof WatchIdleTimeoutError) {
+    if (teardown.signal.reason instanceof WatchTimeoutError) {
       throw teardown.signal.reason;
     }
     throw error;
