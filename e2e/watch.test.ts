@@ -136,8 +136,8 @@ describe("watching from the browser", () => {
     });
     const error = await events.next().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 410, reason: "Expired" });
     expect(isGone(error)).toBe(true);
-    expect((error as ApiError).reason).toBe("Expired");
   });
 
   it("is refused without permission", async () => {
