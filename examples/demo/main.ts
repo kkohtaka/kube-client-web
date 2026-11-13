@@ -162,7 +162,7 @@ function log(kind: string, text: string): void {
   item.append(make("time", undefined, new Date().toLocaleTimeString()), `${kind} ${text}`);
   logElement.prepend(item);
   // Short enough to stay on the page without a scrolling box of its own.
-  while (logElement.children.length > 20) {
+  while (logElement.children.length > 10) {
     logElement.lastElementChild?.remove();
   }
 }
@@ -274,7 +274,7 @@ function createNamespaceCard(namespace: Namespace): HTMLElement {
     card.dataset.own = "true";
     const actions = make("span", "actions");
     actions.append(
-      button("Add deployment", `Add a deployment to ${name}`, "add-deployment", () =>
+      button("Add deployment", `Add deployment to ${name}`, "add-deployment", () =>
         addDeployment(name),
       ),
       button("Delete", `Delete namespace ${name}`, "delete-namespace", () => {
