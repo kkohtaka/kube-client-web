@@ -42,6 +42,16 @@ afterAll(async () => {
 
 /** Saved for a look at the page; CI keeps them as an artifact. */
 async function screenshot(name: string): Promise<void> {
+  // Let shapes that just appeared, and colors that just changed, settle. The
+  // animations of pending and terminating pods never end and are not waited for.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) => animation.finished),
+    ),
+  );
   await page.screenshot({
     path: resolve(import.meta.dirname, "screenshots", `${name}.png`),
     fullPage: true,
@@ -165,15 +175,6 @@ describe("the demo page", () => {
     await eventually(async () => (await podsOf(group, "Running").count()) === 5, "five pods");
     expect(await page.getByTestId("log").textContent()).toContain(`pod ${ownName}/${deployment}-`);
 
-    // Let the shapes that just appeared finish moving.
-    await page.evaluate(() =>
-      Promise.all(
-        document
-          .getAnimations()
-          .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
-          .map((animation) => animation.finished),
-      ),
-    );
     await screenshot("map");
     await page.emulateMedia({ colorScheme: "dark" });
     await screenshot("map-dark");
