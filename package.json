@@ -42,6 +42,7 @@
     "test:watch": "vitest --project unit",
     "test:e2e": "vitest run --project e2e",
     "test:e2e:faults": "vitest run --project faults-chromium && vitest run --project faults-firefox && vitest run --project faults-webkit",
+    "test:oidc": "vitest run --project oidc",
     "test:demo": "vitest run --project demo",
     "demo": "vite --config examples/demo/vite.config.ts",
     "demo:build": "vite build --config examples/demo/vite.config.ts",

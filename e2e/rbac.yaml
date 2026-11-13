@@ -1,5 +1,6 @@
-# Identity used by the browser e2e tests: read-only access to the cluster, and
-# write access inside a dedicated namespace.
+# Identities used by the browser e2e tests: read-only access to the cluster,
+# and write access inside a dedicated namespace. One is a ServiceAccount; the
+# other is the user who signs in through Dex (see dex.yaml).
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -23,6 +24,9 @@ subjects:
   - kind: ServiceAccount
     name: kube-client-web-e2e
     namespace: default
+  - kind: User
+    apiGroup: rbac.authorization.k8s.io
+    name: oidc:jane@example.com
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -37,6 +41,9 @@ subjects:
   - kind: ServiceAccount
     name: kube-client-web-e2e
     namespace: default
+  - kind: User
+    apiGroup: rbac.authorization.k8s.io
+    name: oidc:jane@example.com
 ---
 # The built-in "edit" role does not cover custom resources.
 apiVersion: rbac.authorization.k8s.io/v1
@@ -62,3 +69,6 @@ subjects:
   - kind: ServiceAccount
     name: kube-client-web-e2e
     namespace: default
+  - kind: User
+    apiGroup: rbac.authorization.k8s.io
+    name: oidc:jane@example.com

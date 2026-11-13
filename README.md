@@ -210,6 +210,69 @@ Things to know:
   `sharedInformers()`, and apply to all its informers.
 - `informers.stop()` stops every informer of the factory.
 
+## Signing in with OpenID Connect
+
+When the API server accepts tokens from an OpenID Connect provider,
+`createOidcAuth` signs the user in at that provider and supplies the token.
+
+```ts
+import { createClient, createOidcAuth, SignInRequiredError } from "kube-client-web";
+
+const auth = createOidcAuth({
+  issuer: "https://idp.example.com", // as in the API server's --oidc-issuer-url
+  clientId: "my-app", // as in --oidc-client-id
+  scopes: ["email", "offline_access"],
+});
+
+// On every page load: finishes a sign-in if the browser just came back.
+await auth.completeSignIn();
+
+if (!auth.signedIn) {
+  await auth.signIn(); // leaves the page for the provider
+}
+
+const client = createClient({ baseUrl, token: auth.token });
+
+auth.claims?.email; // for display
+auth.signOut();
+```
+
+It uses the authorization code flow with PKCE as a public client: there is no
+client secret and no server of your own involved. The token given to the API
+server is the ID token.
+
+Things to know:
+
+- `auth.token` renews the token shortly before it expires, if the provider
+  issued a refresh token. Most providers do so for the `offline_access` scope.
+  Without one, the session ends when the ID token expires.
+- When there is no session, or it cannot be renewed any more, `auth.token`
+  throws a `SignInRequiredError`. Requests then fail with it, and informers
+  report it as an `error` event and keep trying; call `auth.signIn()` when you
+  see it.
+- The session is kept in `sessionStorage`, so it survives a reload and ends
+  with the tab. Pass `storage: localStorage` to keep it longer and share it
+  between tabs. Either way, a script running on your page can read the tokens,
+  as it could with any other way of holding them in the browser.
+- `signOut()` forgets the session in this browser. The user stays signed in at
+  the provider.
+- The ID token's issuer, audience, nonce and expiry are checked. Its signature
+  is not: the token comes straight from the provider over TLS, and the API
+  server checks the signature of every token it is given.
+
+The provider has to cooperate, like the cluster:
+
+- The client is registered as a public client with PKCE, with your page as a
+  redirect URI. By default that is the page that calls `signIn()`, without
+  query and fragment; set `redirectUri` to use another one.
+- The provider's configuration and token endpoints allow cross-origin requests
+  from your page.
+- The page is served over HTTPS or from localhost. Browsers offer the
+  cryptography PKCE needs nowhere else.
+
+[`e2e/dex.yaml`](e2e/dex.yaml) and [`e2e/kind-config.yaml`](e2e/kind-config.yaml)
+show a working setup with [Dex](https://dexidp.io/).
+
 ## Demo
 
 [`examples/demo`](examples/demo) is a small page that shows a live view of a
@@ -258,7 +321,9 @@ cooperate:
   origin your page is served from. See [`e2e/kind-config.yaml`](e2e/kind-config.yaml)
   for a working example.
 - **Authentication.** Only bearer tokens are supported. Client certificates and
-  kubeconfig exec plugins are not available to a web page.
+  kubeconfig exec plugins are not available to a web page. See
+  [Signing in with OpenID Connect](#signing-in-with-openid-connect) for one
+  way to get a token.
 - **TLS.** The API server certificate must be trusted by the browser.
 
 ## Development
@@ -274,6 +339,7 @@ End-to-end tests run in Chromium, Firefox and WebKit against a local
 ```sh
 pnpm e2e:up      # create the cluster and the test identity
 pnpm test:e2e
+pnpm test:oidc         # signs in through Dex, which runs in the cluster
 pnpm test:e2e:faults   # restarts the API server and revokes a token
 pnpm e2e:down
 ```

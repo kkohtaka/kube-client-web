@@ -44,6 +44,18 @@ export default defineConfig({
           hookTimeout: 60_000,
         },
       },
+      {
+        // Signs in through the cluster's OpenID Connect provider, in a browser
+        // the test drives itself: signing in leaves the page, which a test
+        // running inside the page would not survive.
+        test: {
+          name: "oidc",
+          include: ["e2e/oidc/*.test.ts"],
+          environment: "node",
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
+        },
+      },
       // Tests that break the cluster on purpose. They would disturb the other
       // tests and each other, so each browser gets a project of its own and
       // the test:e2e:faults script runs them one after the other.

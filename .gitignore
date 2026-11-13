@@ -1,6 +1,7 @@
 node_modules/
 dist/
 examples/demo/screenshots/
+e2e/.oidc/
 coverage/
 *.tsbuildinfo
 .DS_Store
