@@ -72,3 +72,30 @@ subjects:
   - kind: User
     apiGroup: rbac.authorization.k8s.io
     name: oidc:jane@example.com
+---
+# What examples/demo lets its user do, on top of reading everything: make and
+# remove namespaces, and run deployments in them. Only for a local cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-client-web-demo
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["create", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["create", "delete", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-client-web-demo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kube-client-web-demo
+subjects:
+  - kind: User
+    apiGroup: rbac.authorization.k8s.io
+    name: oidc:jane@example.com

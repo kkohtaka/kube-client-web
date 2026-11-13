@@ -1,44 +1,6 @@
 import { resolve } from "node:path";
-import { defineConfig, type Plugin } from "vite";
-import { kubectl, serviceAccount } from "../../e2e/kubectl.ts";
-
-const tokenLifetimeSeconds = 600;
-
-/**
- * Serves `/token`: a fresh, short-lived token for the test identity of the
- * kind cluster. It stands in for whatever hands your application its tokens,
- * typically an OIDC provider. Never expose something like this beyond your
- * own machine.
- */
-function tokenEndpoint(): Plugin {
-  return {
-    name: "demo-token-endpoint",
-    configureServer(server) {
-      server.middlewares.use("/token", (_request, response) => {
-        kubectl(
-          "-n",
-          "default",
-          "create",
-          "token",
-          serviceAccount,
-          `--duration=${tokenLifetimeSeconds}s`,
-        ).then(
-          (token) => {
-            response.setHeader("Content-Type", "application/json");
-            response.setHeader("Cache-Control", "no-store");
-            response.end(
-              JSON.stringify({ token, expiresAt: Date.now() + tokenLifetimeSeconds * 1000 }),
-            );
-          },
-          (error: unknown) => {
-            response.statusCode = 500;
-            response.end(String(error));
-          },
-        );
-      });
-    },
-  };
-}
+import { defineConfig } from "vite";
+import { kubectl } from "../../e2e/kubectl.ts";
 
 export default defineConfig(async ({ command }) => {
   const shared = {
@@ -66,17 +28,23 @@ export default defineConfig(async ({ command }) => {
   });
   return {
     ...shared,
-    plugins: [tokenEndpoint()],
     server: {
       proxy: {
-        // The page reaches the API server through the dev server, so the
-        // browser neither has to trust kind's certificate nor needs CORS.
-        // A deployed application talks to the API server directly instead.
+        // The page reaches the API server and the OpenID Connect provider
+        // through the dev server, so the browser neither has to trust their
+        // certificates nor needs CORS. A deployed application talks to both
+        // directly instead.
         "/k8s": {
           target: apiServer,
           secure: false,
           changeOrigin: true,
           rewrite: (path: string) => path.replace(/^\/k8s/, ""),
+        },
+        "/idp": {
+          target: "https://127.0.0.1:5556",
+          secure: false,
+          changeOrigin: true,
+          rewrite: (path: string) => path.replace(/^\/idp/, ""),
         },
       },
     },

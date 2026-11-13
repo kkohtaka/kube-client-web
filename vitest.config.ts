@@ -40,7 +40,8 @@ export default defineConfig({
           name: "demo",
           include: ["examples/demo/*.test.ts"],
           environment: "node",
-          testTimeout: 30_000,
+          // Pods take a while to start and to go.
+          testTimeout: 120_000,
           hookTimeout: 60_000,
         },
       },
