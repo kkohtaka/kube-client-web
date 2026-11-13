@@ -316,9 +316,27 @@ function createGroup(namespace: string, group: Group, own: boolean): HTMLElement
     if (own) {
       const resource = client.resource(deployments);
       const scale = (by: number) => {
-        const current = followed?.deployments.get(name, namespace)?.spec?.replicas ?? 0;
+        const key = `${namespace}/${name}`;
+        const ask = asked.get(key) ?? { replicas: undefined, requests: 0 };
+        // Count on from what was asked for last, so that a second click
+        // before the first has come back through the informer is not lost.
+        const current =
+          ask.replicas ?? followed?.deployments.get(name, namespace)?.spec?.replicas ?? 0;
         const replicas = Math.max(0, current + by);
-        resource.patch(name, { spec: { replicas } }, { namespace }).catch(report);
+        asked.set(key, ask);
+        ask.replicas = replicas;
+        ask.requests++;
+        resource
+          .patch(name, { spec: { replicas } }, { namespace })
+          .catch((error: unknown) => {
+            // What was asked for will not come; go by the informer again.
+            ask.replicas = undefined;
+            report(error);
+          })
+          .finally(() => {
+            ask.requests--;
+            settle(followed?.deployments.get(name, namespace));
+          });
       };
       const actions = make("span", "actions");
       actions.append(
@@ -360,6 +378,24 @@ function updateGroup(made: HTMLElement, group: Group): void {
       (shape.firstElementChild as HTMLElement).textContent = shape.title;
     },
   );
+}
+
+/**
+ * Replica counts this page has asked for and the informer has not shown yet,
+ * by namespace and name of the deployment.
+ */
+const asked = new Map<string, { replicas: number | undefined; requests: number }>();
+
+/** Forgets what was asked for a deployment once the informer shows it, or it failed. */
+function settle(deployment: Deployment | undefined): void {
+  const key = `${deployment?.metadata?.namespace}/${deployment?.metadata?.name}`;
+  const ask = asked.get(key);
+  if (
+    ask?.requests === 0 &&
+    (ask.replicas ?? deployment?.spec?.replicas) === deployment?.spec?.replicas
+  ) {
+    asked.delete(key);
+  }
 }
 
 /** Draws the informers' local copies. They are the model; the page keeps none of its own. */
@@ -435,6 +471,11 @@ function follow(): Followed {
     });
   }
 
+  model.deployments.on("update", settle);
+  model.deployments.on("delete", (deployment) => {
+    asked.delete(`${deployment.metadata?.namespace}/${deployment.metadata?.name}`);
+  });
+
   Promise.all(all.map(([, informer]) => informer.start())).then(
     () => {
       setStatus("synced", "Live");
@@ -486,6 +527,7 @@ function addDeployment(namespace: string): void {
 function showSignedOut(notice?: string): void {
   followed?.stop();
   followed = undefined;
+  asked.clear();
   mapElement.replaceChildren();
   logElement.replaceChildren();
   clusterElement.hidden = true;
