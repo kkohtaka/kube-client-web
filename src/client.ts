@@ -1,6 +1,7 @@
 import { ApiError } from "./errors.ts";
 import type { ResourceDescriptor } from "./resource.ts";
 import { ResourceClient } from "./resource-client.ts";
+import { SharedInformerFactory, type SharedInformerFactoryOptions } from "./shared-informer.ts";
 import type { KubeObject, Status } from "./types.ts";
 import { joinUrl } from "./url.ts";
 
@@ -53,6 +54,14 @@ export class KubeClient {
   /** Returns a typed client for one resource. */
   resource<T extends KubeObject>(descriptor: ResourceDescriptor<T>): ResourceClient<T> {
     return new ResourceClient<T>(this, descriptor);
+  }
+
+  /**
+   * Returns a factory for informers that share their work: any number of
+   * them following the same objects are served by one list and watch.
+   */
+  sharedInformers(options: SharedInformerFactoryOptions = {}): SharedInformerFactory {
+    return new SharedInformerFactory(this, options);
   }
 
   /** Sends a request and returns the parsed JSON body. Throws {@link ApiError} on a non-2xx status. */
