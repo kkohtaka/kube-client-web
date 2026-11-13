@@ -424,6 +424,76 @@ describe("OidcAuth", () => {
       expect(tokenRequests).toHaveLength(1);
     });
 
+    it("counts the token's lifetime from when it arrived, whatever the local clock says", async () => {
+      for (const offset of [3_600_000, -3_600_000]) {
+        // The provider issues the token at `now`; this browser's clock is an hour off.
+        vi.setSystemTime(now + offset);
+        const { auth, tokenRequests, signIn } = setup();
+        await signIn({ iat: now / 1000 });
+        const token = await auth.token();
+
+        vi.setSystemTime(now + offset + 599_000);
+        expect(auth.signedIn).toBe(true);
+        expect(await auth.token()).toBe(token);
+
+        vi.setSystemTime(now + offset + 601_000);
+        expect(auth.signedIn).toBe(false);
+        await expect(auth.token()).rejects.toThrow(SignInRequiredError);
+        expect(tokenRequests).toHaveLength(1);
+      }
+    });
+
+    it("renews once for all tabs that share the session", async () => {
+      const { auth, storage, answers, tokenRequests, signIn } = setup();
+      await signIn({}, { refresh_token: "refresh-1" });
+      const renewed = idToken({ exp: now / 1000 + 1200 });
+      answers.push(json({ id_token: renewed, refresh_token: "refresh-2" }));
+      // Another tab: its own object over the same storage. It must not need the provider.
+      const other = createOidcAuth({
+        issuer,
+        clientId,
+        storage,
+        fetch: () => Promise.reject(new Error("the other tab asked the provider as well")),
+      });
+
+      vi.setSystemTime(now + 541_000);
+      const tokens = await Promise.all([auth.token(), other.token()]);
+
+      expect(tokens).toEqual([renewed, renewed]);
+      expect(tokenRequests).toHaveLength(2);
+    });
+
+    it("uses the session another tab renewed when its own refresh token was used up", async () => {
+      const { auth, storage, answers, signIn } = setup();
+      await signIn({}, { refresh_token: "refresh-1" });
+      const key = [...storage.values.keys()].find((name) => name.endsWith(":session")) as string;
+      const theirs = idToken({ exp: now / 1000 + 1200 });
+      answers.push(() => {
+        // The other tab got there first, without the two taking turns.
+        storage.setItem(
+          key,
+          JSON.stringify({
+            idToken: theirs,
+            refreshToken: "refresh-2",
+            expiresAt: now + 1_200_000,
+          }),
+        );
+        return json({ error: "invalid_grant" }, 400);
+      });
+
+      vi.setSystemTime(now + 541_000);
+      expect(await auth.token()).toBe(theirs);
+      expect(auth.signedIn).toBe(true);
+
+      // The next renewal uses the other tab's refresh token.
+      answers.push((request) => {
+        expect(request.params.refresh_token).toBe("refresh-2");
+        return json({ id_token: idToken({ exp: now / 1000 + 2400 }) });
+      });
+      vi.setSystemTime(now + 1_150_000);
+      await auth.token();
+    });
+
     it("can be handed to a client as it is", async () => {
       const { auth, signIn } = setup();
       await signIn();
