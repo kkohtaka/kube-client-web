@@ -154,7 +154,8 @@ describe("the demo page", () => {
       "three running pods",
     );
     expect(await podsOf(group).count()).toBe(3);
-    expect(await group.locator(".replicas").textContent()).toBe("3 of 3 ready");
+    // The deployment reports its ready pods a moment after the pods do.
+    await group.locator(".replicas", { hasText: "3 of 3 ready" }).waitFor();
     expect(await podsOf(group).first().textContent()).toMatch(
       new RegExp(`^${deployment}-.+: Running$`),
     );
@@ -167,7 +168,8 @@ describe("the demo page", () => {
     await group.getByTestId("scale-down").click();
     await group.getByTestId("scale-down").click();
     await eventually(async () => (await podsOf(group).count()) === 2, "two pods to remain");
-    expect(await group.locator(".replicas").textContent()).toBe("2 of 2 ready");
+    // The deployment reports its ready pods a moment after the pods do.
+    await group.locator(".replicas", { hasText: "2 of 2 ready" }).waitFor();
   });
 
   it("shows a change made with kubectl without reloading", async () => {
