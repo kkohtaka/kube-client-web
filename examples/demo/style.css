@@ -194,9 +194,11 @@ tr.flash td {
   animation: flash 1.2s ease-out;
 }
 
+/* Kept faint: text in a row has to stay readable from the first frame of the
+   flash, in both color schemes. */
 @keyframes flash {
   from {
-    background: color-mix(in srgb, var(--accent) 25%, transparent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
   }
   to {
     background: transparent;
