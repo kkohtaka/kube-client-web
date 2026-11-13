@@ -13,6 +13,8 @@
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 15px;
   line-height: 1.5;
+  /* Multiplies every duration. */
+  --motion: 1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -36,14 +38,19 @@ body {
   color: var(--fg);
 }
 
-header,
+.top,
 main {
-  max-width: 1040px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 24px;
 }
 
-header {
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 24px;
   padding-top: 32px;
 }
 
@@ -57,7 +64,18 @@ h2 {
   font-size: 16px;
 }
 
-header p {
+h3,
+h4 {
+  margin: 0;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+h4 {
+  font-size: 13px;
+}
+
+.top p {
   margin: 0;
   color: var(--muted);
 }
@@ -65,24 +83,6 @@ header p {
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.92em;
-}
-
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin: 24px 0 12px;
-}
-
-.views {
-  display: inline-flex;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
 }
 
 button {
@@ -95,19 +95,20 @@ button {
   cursor: pointer;
 }
 
-button:hover {
+button:hover:not(:disabled) {
   border-color: var(--accent);
 }
 
-.views button {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
-.views button[aria-pressed="true"] {
+button.primary {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--on-accent);
+  font-weight: 600;
 }
 
 .visually-hidden {
@@ -119,7 +120,40 @@ button:hover {
   white-space: nowrap;
 }
 
-#create {
+.session {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.session[hidden] {
+  display: none;
+}
+
+.welcome {
+  max-width: 560px;
+  margin: 48px 0;
+}
+
+.welcome h2 {
+  margin-top: 0;
+  font-size: 18px;
+}
+
+.notice {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0 12px;
+}
+
+.toolbar .primary {
   margin-left: auto;
 }
 
@@ -151,62 +185,247 @@ button:hover {
   color: var(--muted);
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+/* --- The map ------------------------------------------------------------- */
+
+.legend,
+.map,
+.groups,
+.pods {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-th,
-td {
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--line);
-  vertical-align: top;
-}
-
-th {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-
-td.name {
-  font-weight: 600;
-}
-
-td.mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-bottom: 16px;
   font-size: 13px;
   color: var(--muted);
 }
 
-td.actions {
-  text-align: right;
+.legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
-td.actions button {
+.map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+/* A namespace is a region; what was made on this page has an accent edge. */
+.namespace {
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  animation: arrive calc(0.4s * var(--motion)) ease-out;
+}
+
+.namespace[data-own] {
+  border-color: var(--accent);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.namespace[data-phase="Terminating"] {
+  border-style: dashed;
+}
+
+.namespace[data-phase="Terminating"] .groups {
+  opacity: 0.5;
+}
+
+.namespace > header,
+.group > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.phase {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warn);
+}
+
+.actions {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.actions button {
   padding: 2px 8px;
   font-size: 13px;
-}
-
-tr.flash td {
-  animation: flash 1.2s ease-out;
-}
-
-/* Kept faint: text in a row has to stay readable from the first frame of the
-   flash, in both color schemes. */
-@keyframes flash {
-  from {
-    background: color-mix(in srgb, var(--accent) 12%, transparent);
-  }
-  to {
-    background: transparent;
-  }
+  background: var(--bg);
 }
 
 .empty {
+  margin: 10px 0 0;
+  font-size: 13px;
   color: var(--muted);
+}
+
+/* A deployment is a box inside its namespace, holding its pods. */
+.group {
+  margin-top: 10px;
+  padding: 8px 10px 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  animation: arrive calc(0.4s * var(--motion)) ease-out;
+}
+
+.group .loose {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.replicas {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  min-height: 22px;
+}
+
+/* A pod is a small shape. Its outline and fill say what state it is in, so
+   that the states can be told apart without relying on color. */
+.pod {
+  width: 22px;
+  height: 22px;
+  animation: pop calc(0.45s * var(--motion)) cubic-bezier(0.3, 1.6, 0.6, 1);
+}
+
+.legend .pod {
+  width: 16px;
+  height: 16px;
+  animation: none;
+}
+
+.pod::before {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid var(--shape);
+  background: var(--shape);
+  transition:
+    background calc(0.3s * var(--motion)),
+    border-color calc(0.3s * var(--motion)),
+    border-radius calc(0.3s * var(--motion));
+}
+
+.pod[data-state="Pending"] {
+  --shape: var(--warn);
+}
+
+.pod[data-state="Pending"]::before {
+  border-style: dashed;
+  background: transparent;
+  animation: spin 2.4s linear infinite;
+  animation-play-state: var(--endless, running);
+}
+
+.pod[data-state="Starting"] {
+  --shape: var(--warn);
+}
+
+.pod[data-state="Starting"]::before {
+  background: radial-gradient(var(--shape) 0 35%, transparent 40%);
+}
+
+.pod[data-state="Running"] {
+  --shape: var(--ok);
+}
+
+.pod[data-state="Terminating"] {
+  --shape: var(--muted);
+}
+
+.pod[data-state="Terminating"]::before {
+  border-style: dotted;
+  background: transparent;
+  animation: fade 1s ease-in-out infinite alternate;
+  animation-play-state: var(--endless, running);
+}
+
+.pod[data-state="Failed"] {
+  --shape: var(--bad);
+}
+
+.pod[data-state="Failed"]::before {
+  border-radius: 4px;
+  background:
+    linear-gradient(45deg, transparent 42%, var(--bg) 42% 58%, transparent 58%),
+    linear-gradient(-45deg, transparent 42%, var(--bg) 42% 58%, transparent 58%), var(--shape);
+}
+
+.pod[data-state="Succeeded"] {
+  --shape: var(--muted);
+}
+
+.pod[data-state="Succeeded"]::before {
+  border-radius: 4px;
+}
+
+.leaving {
+  animation: leave calc(0.35s * var(--motion)) ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+@keyframes leave {
+  to {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fade {
+  to {
+    opacity: 0.35;
+  }
+}
+
+/* Without the movement, every change still shows: things appear and go at once. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0;
+    --endless: paused;
+  }
 }
 
 .log {

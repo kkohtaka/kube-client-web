@@ -278,9 +278,10 @@ show a working setup with [Dex](https://dexidp.io/).
 
 ## Demo
 
-[`examples/demo`](examples/demo) is a small page that shows a live view of a
-cluster with an informer. See its README for how to run it against a local
-kind cluster.
+[`examples/demo`](examples/demo) is a page that signs in with OpenID Connect
+and draws a live map of a cluster: namespaces, their deployments and every
+pod, appearing and disappearing as the cluster changes. See its README for how
+to run it against a local kind cluster.
 
 ## Connections that fail
 
