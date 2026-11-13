@@ -252,8 +252,10 @@ Things to know:
   see it.
 - The session is kept in `sessionStorage`, so it survives a reload and ends
   with the tab. Pass `storage: localStorage` to keep it longer and share it
-  between tabs. Either way, a script running on your page can read the tokens,
+  between tabs; tabs then take turns renewing it. Either way, a script running on your page can read the tokens,
   as it could with any other way of holding them in the browser.
+- A token is taken to live as long as it says from the moment it arrives, so
+  a wrong clock on the user's device does not end the session early or late.
 - `signOut()` forgets the session in this browser. The user stays signed in at
   the provider.
 - The ID token's issuer, audience, nonce and expiry are checked. Its signature

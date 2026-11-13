@@ -92,7 +92,7 @@ interface Pending {
 interface Session {
   idToken: string;
   refreshToken?: string | undefined;
-  /** When the ID token expires, in milliseconds since the epoch. */
+  /** When the ID token expires, in milliseconds since the epoch on this browser's clock. */
   expiresAt: number;
 }
 
@@ -242,7 +242,7 @@ export class OidcAuth {
     }
     // Requests that find the token expired at the same time share one
     // renewal: a provider may accept a refresh token only once.
-    this.#renewal ??= this.#renew(session).finally(() => {
+    this.#renewal ??= this.#renew().finally(() => {
       this.#renewal = undefined;
     });
     return this.#renewal;
@@ -279,7 +279,25 @@ export class OidcAuth {
     this.#remove("pending");
   }
 
-  async #renew(session: Session): Promise<string> {
+  /**
+   * Renews the session, one tab at a time: tabs that share their storage
+   * share the refresh token, and a provider may accept it only once.
+   */
+  #renew(): Promise<string> {
+    return exclusively(`${this.#key}:renew`, async () => {
+      // Read again: another tab may have renewed the session in the meantime.
+      const session = this.#read<Session>("session");
+      if (!session) {
+        throw new SignInRequiredError("not signed in");
+      }
+      if (session.expiresAt - Date.now() > this.#renewBeforeMs) {
+        return session.idToken;
+      }
+      return this.#renewWith(session);
+    });
+  }
+
+  async #renewWith(session: Session): Promise<string> {
     if (session.refreshToken === undefined) {
       if (session.expiresAt > Date.now()) {
         // Nothing to renew it with, but still good for a moment.
@@ -296,8 +314,16 @@ export class OidcAuth {
       });
     } catch (error) {
       if (error instanceof OidcError && error.error === "invalid_grant") {
-        // The provider no longer honors the refresh token.
-        this.#remove("session");
+        // The provider no longer honors the refresh token. Where tabs cannot
+        // take turns, that may be because another one has just used it.
+        const current = this.#read<Session>("session");
+        if (current && current.refreshToken !== session.refreshToken) {
+          if (current.expiresAt > Date.now()) {
+            return current.idToken;
+          }
+        } else {
+          this.#remove("session");
+        }
         throw new SignInRequiredError("the session has ended", { cause: error });
       }
       throw error;
@@ -351,11 +377,15 @@ export class OidcAuth {
     if (typeof claims.exp !== "number") {
       throw new OidcError("the ID token does not say when it expires");
     }
+    // The provider's clock and this browser's may disagree by more than the
+    // token lives. The token has just been issued, so count its lifetime
+    // from now instead of comparing its expiry with the local clock.
+    const lifetime = typeof claims.iat === "number" ? claims.exp - claims.iat : 0;
     const refreshToken = body?.refresh_token;
     return {
       idToken,
       refreshToken: typeof refreshToken === "string" ? refreshToken : undefined,
-      expiresAt: claims.exp * 1000,
+      expiresAt: lifetime > 0 ? Date.now() + lifetime * 1000 : claims.exp * 1000,
     };
   }
 
@@ -414,6 +444,15 @@ export class OidcAuth {
 
 export function createOidcAuth(config: OidcConfig): OidcAuth {
   return new OidcAuth(config);
+}
+
+/**
+ * Runs one caller at a time among the pages of this origin, where the browser
+ * offers locks for that. It does on HTTPS and on localhost.
+ */
+function exclusively<R>(name: string, run: () => Promise<R>): Promise<R> {
+  const locks = globalThis.navigator?.locks;
+  return locks ? locks.request(name, run) : run();
 }
 
 function currentPage(): string {
