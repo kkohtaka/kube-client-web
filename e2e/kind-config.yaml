@@ -2,6 +2,12 @@
 #
 # The API server allows cross-origin requests from pages served on a loopback
 # address, which is where Vitest's browser mode serves the test page.
+#
+# It also accepts ID tokens of the Dex instance from dex.yaml, which runs in
+# the cluster on the node's network. That way the browser on the host and the
+# API server in the node both reach it as https://127.0.0.1:5556, the address
+# the tokens name as their issuer. cluster-up.sh creates the CA in .oidc
+# before the cluster.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 name: kube-client-web
@@ -10,9 +16,28 @@ networking:
   apiServerPort: 6443
 nodes:
   - role: control-plane
+    extraPortMappings:
+      - containerPort: 5556
+        hostPort: 5556
+        listenAddress: "127.0.0.1"
+    extraMounts:
+      - hostPath: ./.oidc/ca.crt
+        containerPath: /etc/kubernetes/oidc/ca.crt
+        readOnly: true
     kubeadmConfigPatches:
       - |
         kind: ClusterConfiguration
         apiServer:
           extraArgs:
             cors-allowed-origins: "^http://(localhost|127\\.0\\.0\\.1)(:[0-9]+)?$"
+            oidc-issuer-url: "https://127.0.0.1:5556/dex"
+            oidc-client-id: "kube-client-web"
+            oidc-ca-file: "/etc/kubernetes/oidc/ca.crt"
+            oidc-username-claim: "email"
+            oidc-username-prefix: "oidc:"
+          extraVolumes:
+            - name: oidc
+              hostPath: /etc/kubernetes/oidc
+              mountPath: /etc/kubernetes/oidc
+              readOnly: true
+              pathType: Directory

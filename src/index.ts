@@ -10,6 +10,15 @@ export {
 export { ApiError, isGone } from "./errors.ts";
 export { Informer, type InformerEvents, type InformerOptions } from "./informer.ts";
 export {
+  createOidcAuth,
+  OidcAuth,
+  type OidcConfig,
+  OidcError,
+  type OidcStorage,
+  type SignInOptions,
+  SignInRequiredError,
+} from "./oidc.ts";
+export {
   defineResource,
   type ResourceDescriptor,
   type ResourcePathOptions,

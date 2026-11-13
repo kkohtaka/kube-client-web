@@ -51,6 +51,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
       - run: pnpm e2e:up
       - run: pnpm test:e2e
+      - run: pnpm test:oidc
       - run: pnpm test:demo
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
@@ -64,3 +65,5 @@ jobs:
         run: |
           kubectl --context kind-kube-client-web -n kube-system get pods -o wide || true
           kubectl --context kind-kube-client-web -n kube-system logs -l component=kube-apiserver --tail=100 || true
+          kubectl --context kind-kube-client-web -n dex get pods -o wide || true
+          kubectl --context kind-kube-client-web -n dex logs deployment/dex --tail=100 || true

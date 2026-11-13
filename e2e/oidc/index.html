@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>kube-client-web OIDC test page</title>
+  </head>
+  <body>
+    <h1>OIDC test page</h1>
+    <p id="state" data-state="loading">loading</p>
+    <p>User: <span id="user"></span></p>
+    <p>API server sees: <span id="whoami"></span></p>
+    <p>ConfigMaps: <span id="configmaps"></span></p>
+    <p>Renewals: <span id="renewals">0</span></p>
+    <p id="error"></p>
+    <button id="sign-in" type="button">Sign in</button>
+    <button id="sign-out" type="button">Sign out</button>
+    <button id="renew" type="button">Renew</button>
+    <button id="call" type="button">Call the API server</button>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
