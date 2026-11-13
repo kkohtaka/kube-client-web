@@ -26,6 +26,12 @@ export {
   ResourceClient,
   type UpdateOptions,
 } from "./resource-client.ts";
+export {
+  SharedInformer,
+  SharedInformerFactory,
+  type SharedInformerFactoryOptions,
+  type SharedInformerSelection,
+} from "./shared-informer.ts";
 export type {
   KubeList,
   KubeObject,

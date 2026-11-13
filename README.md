@@ -172,6 +172,44 @@ Things to know:
 - Objects in a list come without `apiVersion` and `kind`; the API server only
   sets them on single objects and watch events.
 
+### Shared informers
+
+When several parts of a page follow the same objects, a shared informer
+factory serves them all with one list, one watch and one copy of the objects,
+instead of one of each per user.
+
+```ts
+const informers = client.sharedInformers();
+
+// Anywhere on the page, as often as needed:
+const informer = informers.informer(configMaps, { namespace: "default" });
+informer.on("add", (object) => {});
+await informer.start();
+
+informer.list();
+informer.stop(); // the watch ends when the last user has stopped
+```
+
+Each call to `informer()` returns an informer of its own, with the same
+methods and events as above. Those for the same resource, namespace and
+selectors are served by a single list and watch, which runs while at least one
+of them is started.
+
+Things to know:
+
+- An informer started while others are already following the same objects is
+  told about every object they know as `add`, and `start()` resolves without
+  a request.
+- `stop()` ends the events for that informer only. Unlike a plain informer, it
+  is told about every object again after it is started again, not about what
+  changed in between.
+- All users get the same objects, so treat them as read-only.
+- Selectors are compared as written: `a=1,b=2` and `b=2,a=1` do not share a
+  watch.
+- Options such as `pageSize` or `backoff` are given once, to
+  `sharedInformers()`, and apply to all its informers.
+- `informers.stop()` stops every informer of the factory.
+
 ## Demo
 
 [`examples/demo`](examples/demo) is a small page that shows a live view of a
