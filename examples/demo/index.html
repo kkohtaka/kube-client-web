@@ -7,42 +7,55 @@
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
-    <header>
-      <h1>kube-client-web demo</h1>
-      <p>
-        A live view of a cluster, kept up to date by an informer. Change something with
-        <code>kubectl</code> and watch it appear here.
-      </p>
+    <header class="top">
+      <div>
+        <h1>kube-client-web demo</h1>
+        <p>
+          A live map of a cluster: namespaces, their deployments and every pod, drawn from
+          informers as things change.
+        </p>
+      </div>
+      <div class="session" id="session" hidden>
+        <span id="user" data-testid="user"></span>
+        <button type="button" id="sign-out" data-testid="sign-out">Sign out</button>
+      </div>
     </header>
 
     <main>
-      <section class="toolbar">
-        <fieldset class="views" id="views">
-          <legend class="visually-hidden">Resource</legend>
-        </fieldset>
-        <span class="status" id="status" role="status" data-testid="status" data-state="connecting"
-          >Connecting</span
-        >
-        <span class="count" id="count" data-testid="count"></span>
-        <button type="button" id="create" data-testid="create">Create a ConfigMap</button>
+      <section class="welcome" id="signed-out" data-testid="signed-out" hidden>
+        <h2>Sign in to see the cluster</h2>
+        <p>
+          The page signs you in with the cluster's OpenID Connect provider and talks to the API
+          server as you. On the local demo cluster the user is
+          <code>jane@example.com</code> with the password <code>password</code>.
+        </p>
+        <p class="notice" id="notice" role="alert" data-testid="notice" hidden></p>
+        <button type="button" class="primary" id="sign-in" data-testid="sign-in">Sign in</button>
       </section>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Namespace</th>
-            <th>Name</th>
-            <th id="detail-heading">Details</th>
-            <th>Created</th>
-            <th>Version</th>
-            <th><span class="visually-hidden">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody id="rows"></tbody>
-      </table>
-      <p class="empty" id="empty" hidden>Nothing here yet.</p>
+      <section id="cluster" hidden>
+        <div class="toolbar">
+          <span class="status" id="status" role="status" data-testid="status" data-state="connecting"
+            >Connecting</span
+          >
+          <span class="count" id="count" data-testid="count"></span>
+          <button type="button" class="primary" id="create-namespace" data-testid="create-namespace">
+            New namespace
+          </button>
+        </div>
 
-      <section>
+        <ul class="legend" aria-label="What the shapes mean">
+          <li><span class="pod" data-state="Pending"></span>Pending</li>
+          <li><span class="pod" data-state="Starting"></span>Starting</li>
+          <li><span class="pod" data-state="Running"></span>Running</li>
+          <li><span class="pod" data-state="Terminating"></span>Terminating</li>
+          <li><span class="pod" data-state="Failed"></span>Failed</li>
+          <li><span class="pod" data-state="Succeeded"></span>Succeeded</li>
+        </ul>
+
+        <h2 class="visually-hidden">Namespaces</h2>
+        <ul class="map" id="map" data-testid="map" aria-label="Namespaces"></ul>
+
         <h2>Events</h2>
         <ol class="log" id="log" data-testid="log"></ol>
       </section>
