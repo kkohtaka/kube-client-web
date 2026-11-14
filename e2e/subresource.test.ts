@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { ApiError } from "../src/index.ts";
 import {
   client,
   deployments,
@@ -33,19 +32,18 @@ async function run(script: string): Promise<string> {
   cleanups.push(() => resource.delete(name, { namespace, gracePeriodSeconds: 0 }));
   await resource.create({ metadata: { name, namespace }, spec: shell(script) });
 
-  // The log cannot be read before the container exists; the API server says
-  // so with a BadRequest.
+  // The log cannot be read before the container has started. Until then the
+  // API server refuses with a BadRequest, or answers with nothing at all.
   const deadline = performance.now() + 60_000;
   for (;;) {
-    try {
-      await resource.log(name, { namespace, limitBytes: 1 });
+    const phase = (await resource.get(name, { namespace })).status?.phase;
+    if (phase === "Running" || phase === "Succeeded") {
       return name;
-    } catch (error) {
-      if ((error as ApiError).status !== 400 || performance.now() > deadline) {
-        throw error;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 200));
     }
+    if (phase === "Failed" || performance.now() > deadline) {
+      throw new Error(`the pod ${name} did not start; its phase is ${phase}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 }
 
