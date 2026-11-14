@@ -210,6 +210,77 @@ Things to know:
   `sharedInformers()`, and apply to all its informers.
 - `informers.stop()` stops every informer of the factory.
 
+### Logs
+
+`log` reads the log of a pod's container as it is now. `followLog` keeps
+reading as the log grows and yields it line by line:
+
+```ts
+const text = await pods.log("web-0", { namespace: "default", tailLines: 100 });
+
+const stop = new AbortController();
+for await (const line of pods.followLog("web-0", {
+  namespace: "default",
+  container: "app", // needed when the pod has several
+  tailLines: 10, // start with the last ten lines
+  signal: stop.signal,
+})) {
+  console.log(line);
+}
+// The container has stopped.
+```
+
+Both take the options of the API: `container`, `previous`, `tailLines`,
+`sinceSeconds`, `sinceTime`, `timestamps` and `limitBytes`.
+
+Following ends when the container stops, and by leaving the loop or aborting
+`signal`. It throws when the connection is lost, and does not connect again
+by itself: a log can only be resumed by time, not by position. To carry on,
+ask for `timestamps` and start again with `sinceTime` set to the time of the
+last line you saw; the lines of that moment arrive a second time. A log can be
+silent for long, so a connection that died without a sign is not noticed.
+
+A log that cannot be read yet, such as that of a container still starting, is
+an `ApiError` with status 400.
+
+### Scale, status and other subresources
+
+`getScale` and `scale` read and set the number of replicas of anything that
+can be scaled: deployments, stateful sets, replica sets, and custom resources
+that declare a `scale` subresource.
+
+```ts
+const scale = await deployments.getScale("web", { namespace: "default" });
+scale.spec?.replicas; // wanted; left out by the server when zero
+scale.status?.replicas; // there now
+
+await deployments.scale("web", 5, { namespace: "default" });
+```
+
+Setting the replicas this way needs permission for `deployments/scale` only,
+not for the deployment itself.
+
+For `status`, `get`, `update`, `patch` and `apply` take
+`subresource: "status"`; the object keeps its type:
+
+```ts
+await widgets.patch("w1", { status: { ready: true } }, { namespace, subresource: "status" });
+```
+
+Any other subresource is reached with `subresource()`, which offers `get`,
+`create`, `update` and `patch` on it. `create` posts to it, which is how an
+eviction is requested:
+
+```ts
+await pods.subresource("web-0", "eviction", { namespace: "default" }).create({
+  apiVersion: "policy/v1",
+  kind: "Eviction",
+  metadata: { name: "web-0", namespace: "default" },
+});
+```
+
+`exec`, `attach` and `portforward` are not supported: they need WebSockets.
+
 ## Signing in with OpenID Connect
 
 When the API server accepts tokens from an OpenID Connect provider,
@@ -280,8 +351,9 @@ show a working setup with [Dex](https://dexidp.io/).
 
 [`examples/demo`](examples/demo) is a page that signs in with OpenID Connect
 and draws a live map of a cluster: namespaces, their deployments and every
-pod, appearing and disappearing as the cluster changes. See its README for how
-to run it against a local kind cluster.
+pod, appearing and disappearing as the cluster changes. Choosing a pod shows
+its log as it grows. See its README for how to run it against a local kind
+cluster.
 
 ## Connections that fail
 
