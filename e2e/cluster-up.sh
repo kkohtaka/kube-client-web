@@ -47,6 +47,18 @@ kubectl --context "${context}" -n dex create secret tls dex-tls \
 kubectl --context "${context}" apply -f dex.yaml
 kubectl --context "${context}" -n dex rollout status deployment/dex --timeout=180s
 
+# The API server's certificate is checked against the cluster's CA, which the
+# kubeconfig holds.
+ca="$(mktemp)"
+trap 'rm -f "${ca}"' EXIT
+kubectl config view --raw --minify --context "${context}" \
+  -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' |
+  base64 --decode >"${ca}"
+if [ ! -s "${ca}" ]; then
+  echo "The kubeconfig has no CA for ${context}." >&2
+  exit 1
+fi
+
 # The API server looks for the provider again every few seconds until it finds
 # it. Wait until it accepts a token, so that the tests do not have to.
 echo "Waiting for the API server to accept tokens from ${issuer}"
@@ -57,7 +69,7 @@ for attempt in $(seq 1 60); do
     --data-urlencode "scope=openid email" 2>/dev/null |
     sed -n 's/.*"id_token":"\([^"]*\)".*/\1/p' || true)"
   if [ -n "${token}" ]; then
-    status="$(curl -sk -o /dev/null -w '%{http_code}' \
+    status="$(curl -sS --cacert "${ca}" -o /dev/null -w '%{http_code}' \
       -H "Authorization: Bearer ${token}" https://127.0.0.1:6443/version || true)"
     if [ "${status}" = 200 ]; then
       exit 0
