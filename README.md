@@ -317,6 +317,10 @@ Things to know:
 - `auth.token` renews the token shortly before it expires, if the provider
   issued a refresh token. Most providers do so for the `offline_access` scope.
   Without one, the session ends when the ID token expires.
+- To renew the session, the provider has to answer a refresh token with a new
+  ID token. Dex and Keycloak do. OpenID Connect allows an answer without one;
+  with such a provider the session ends when the ID token expires, and
+  `auth.token` throws a `SignInRequiredError` that says so.
 - When renewing fails for a passing reason, such as the network or an error
   at the provider, `auth.token` keeps supplying the current token until it
   expires, and tries again on the next call.
