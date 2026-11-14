@@ -47,6 +47,13 @@ the cluster.
   `update` or `delete` the map is drawn again from their `list()`.
 - **Drawing changes.** `sync()` keeps the element of every object that stays,
   so only new shapes run their arrival animation and only removed ones leave.
+- **Scaling.** The − and + buttons use `scale()`, which changes the number of
+  replicas through the deployment's `scale` subresource. The demo's user may
+  do that and nothing else to a deployment once it exists.
+- **Logs.** Choosing a pod on the map shows the last lines of its log and
+  follows it with `followLog()`. The pods of the control plane in
+  `kube-system` have something to say; the ones the page creates run a
+  container that writes nothing.
 - **Errors.** The `error` listener only updates the status line. Reconnecting
   is the informer's job. Stop the cluster's container for a moment to see it.
 
@@ -63,8 +70,10 @@ application.
   [Cluster requirements](../../README.md#cluster-requirements) and
   [Signing in with OpenID Connect](../../README.md#signing-in-with-openid-connect).
   It also means the browser speaks HTTP/1.1 here, with its limit of six
-  connections, of which the three watches hold three.
+  connections, of which the three watches hold three and a log that is
+  followed a fourth.
 - **The provider knows one user with a well-known password,** and that user
-  may create and delete namespaces and deployments anywhere in the cluster
+  may create and delete namespaces and deployments, and scale deployments,
+  anywhere in the cluster
   ([`e2e/dex.yaml`](../../e2e/dex.yaml), [`e2e/rbac.yaml`](../../e2e/rbac.yaml)).
   The cluster only listens on `127.0.0.1`.

@@ -74,7 +74,9 @@ subjects:
     name: oidc:jane@example.com
 ---
 # What examples/demo lets its user do, on top of reading everything: make and
-# remove namespaces, and run deployments in them. Only for a local cluster.
+# remove namespaces, and run and scale deployments in them. Scaling goes
+# through the scale subresource, so the user may not change a deployment in
+# any other way. Only for a local cluster.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -85,7 +87,10 @@ rules:
     verbs: ["create", "delete"]
   - apiGroups: ["apps"]
     resources: ["deployments"]
-    verbs: ["create", "delete", "patch"]
+    verbs: ["create", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -124,10 +124,33 @@ describe("the demo page", () => {
     );
     expect(await podsOf(system.locator('.group[data-deployment="coredns"]')).count()).toBe(2);
     // Nothing that was not made here can be changed from here.
-    expect(await system.locator("button").count()).toBe(0);
+    expect(await system.locator(".actions button").count()).toBe(0);
     expect(await page.getByTestId("count").textContent()).toMatch(
       /^\d+ namespaces · \d+ deployments · \d+ pods$/,
     );
+  });
+
+  it("shows the log of a pod chosen on the map, and follows it", async () => {
+    const coredns = namespace("kube-system").locator('.group[data-deployment="coredns"]');
+    const pod = podsOf(coredns).first();
+    const name = await pod.getAttribute("data-pod");
+
+    await pod.getByRole("button").click();
+
+    await page.getByTestId("pod-log").waitFor();
+    expect(await page.getByTestId("pod-log-title").textContent()).toBe(
+      `Log of kube-system/${name}`,
+    );
+    // CoreDNS writes its version when it starts.
+    await page.getByTestId("pod-log-lines").locator("li", { hasText: "CoreDNS-" }).waitFor();
+    expect(await page.getByTestId("pod-log-status").textContent()).toBe("Following");
+    expect(await pod.getByRole("button").getAttribute("aria-pressed")).toBe("true");
+    await screenshot("pod-log");
+    await expectAccessible();
+
+    await page.getByTestId("pod-log-close").click();
+    expect(await page.getByTestId("pod-log").isVisible()).toBe(false);
+    expect(await pod.getByRole("button").getAttribute("aria-pressed")).toBe("false");
   });
 
   it("creates a namespace from the page", async () => {
