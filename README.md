@@ -317,6 +317,9 @@ Things to know:
 - `auth.token` renews the token shortly before it expires, if the provider
   issued a refresh token. Most providers do so for the `offline_access` scope.
   Without one, the session ends when the ID token expires.
+- When renewing fails for a passing reason, such as the network or an error
+  at the provider, `auth.token` keeps supplying the current token until it
+  expires, and tries again on the next call.
 - When there is no session, or it cannot be renewed any more, `auth.token`
   throws a `SignInRequiredError`. Requests then fail with it, and informers
   report it as an `error` event and keep trying; call `auth.signIn()` when you

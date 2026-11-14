@@ -225,7 +225,8 @@ export class OidcAuth {
 
   /**
    * Resolves with a valid ID token, renewing it first when it is about to
-   * expire and the provider issued a refresh token. Throws a
+   * expire and the provider issued a refresh token. When renewing fails, it
+   * resolves with the current token for as long as that is valid. Throws a
    * {@link SignInRequiredError} when there is no session, or it has ended
    * and cannot be renewed.
    *
@@ -325,6 +326,11 @@ export class OidcAuth {
           this.#remove("session");
         }
         throw new SignInRequiredError("the session has ended", { cause: error });
+      }
+      if (session.expiresAt > Date.now()) {
+        // The provider could not be asked, or failed. The token is still good
+        // for a moment, and the next call tries again.
+        return session.idToken;
       }
       throw error;
     }
