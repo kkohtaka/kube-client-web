@@ -96,6 +96,12 @@ interface Session {
   expiresAt: number;
 }
 
+/** What the token endpoint may answer to a refresh token: no new ID token. */
+interface WithoutIdToken {
+  idToken: undefined;
+  refreshToken: string | undefined;
+}
+
 /**
  * Signs a user in with an OpenID Connect provider and supplies the ID token
  * that a Kubernetes API server configured for that provider accepts.
@@ -219,6 +225,9 @@ export class OidcAuth {
       },
       pending.nonce,
     );
+    if (session.idToken === undefined) {
+      throw new OidcError("the provider's answer has no ID token");
+    }
     this.#write("session", session);
     return true;
   }
@@ -307,7 +316,7 @@ export class OidcAuth {
       this.#remove("session");
       throw new SignInRequiredError("the session has expired");
     }
-    let renewed: Session;
+    let renewed: Session | WithoutIdToken;
     try {
       renewed = await this.#requestTokens({
         grant_type: "refresh_token",
@@ -336,6 +345,17 @@ export class OidcAuth {
     }
     // A provider that does not hand out a new refresh token lets the old one be used again.
     renewed.refreshToken ??= session.refreshToken;
+    if (renewed.idToken === undefined) {
+      if (session.expiresAt <= Date.now()) {
+        // Asking again would bring no ID token either.
+        this.#remove("session");
+        throw new SignInRequiredError(
+          "the session has expired: the provider renews it without a new ID token",
+        );
+      }
+      // Keep the refresh token all the same: the old one may be used up.
+      renewed = { ...session, refreshToken: renewed.refreshToken };
+    }
     // Unless the user signed out in the meantime.
     if (this.#read<Session>("session")) {
       this.#write("session", renewed);
@@ -343,8 +363,14 @@ export class OidcAuth {
     return renewed.idToken;
   }
 
-  /** Asks the token endpoint for tokens and checks the ID token it returns. */
-  async #requestTokens(grant: Record<string, string>, nonce?: string): Promise<Session> {
+  /**
+   * Asks the token endpoint for tokens and checks the ID token it returns.
+   * OpenID Connect lets a provider leave that out when a session is renewed.
+   */
+  async #requestTokens(
+    grant: Record<string, string>,
+    nonce?: string,
+  ): Promise<Session | WithoutIdToken> {
     const metadata = await this.#discover();
     const response = await this.#fetch(metadata.token_endpoint, {
       method: "POST",
@@ -361,9 +387,10 @@ export class OidcAuth {
         error,
       );
     }
+    const refreshToken = typeof body?.refresh_token === "string" ? body.refresh_token : undefined;
     const idToken = body?.id_token;
     if (typeof idToken !== "string") {
-      throw new OidcError("the provider's answer has no ID token");
+      return { idToken: undefined, refreshToken };
     }
 
     // The token came straight from the provider over TLS, which vouches for
@@ -387,10 +414,9 @@ export class OidcAuth {
     // token lives. The token has just been issued, so count its lifetime
     // from now instead of comparing its expiry with the local clock.
     const lifetime = typeof claims.iat === "number" ? claims.exp - claims.iat : 0;
-    const refreshToken = body?.refresh_token;
     return {
       idToken,
-      refreshToken: typeof refreshToken === "string" ? refreshToken : undefined,
+      refreshToken,
       expiresAt: lifetime > 0 ? Date.now() + lifetime * 1000 : claims.exp * 1000,
     };
   }

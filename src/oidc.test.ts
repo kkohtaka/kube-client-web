@@ -427,6 +427,42 @@ describe("OidcAuth", () => {
       expect(await auth.token()).toBe(renewed);
     });
 
+    it("keeps the refresh token of a renewal that brings no ID token", async () => {
+      const { auth, answers, tokenRequests, signIn } = setup();
+      await signIn({}, { refresh_token: "refresh-1" });
+      const current = await auth.token();
+      answers.push(json({ access_token: "access", refresh_token: "refresh-2" }));
+
+      vi.setSystemTime(now + 541_000);
+      expect(await auth.token()).toBe(current);
+      expect(auth.signedIn).toBe(true);
+
+      // The provider would refuse the first refresh token now.
+      const renewed = idToken({ exp: now / 1000 + 1200 });
+      answers.push(json({ id_token: renewed }));
+      expect(await auth.token()).toBe(renewed);
+      expect(tokenRequests[2]?.params.refresh_token).toBe("refresh-2");
+    });
+
+    it("asks to sign in again when the token expired and renewals bring no ID token", async () => {
+      const { auth, answers, tokenRequests, signIn } = setup();
+      await signIn({}, { refresh_token: "refresh-1" });
+      answers.push(json({ access_token: "access", refresh_token: "refresh-2" }));
+      answers.push(json({ access_token: "access", refresh_token: "refresh-3" }));
+
+      vi.setSystemTime(now + 541_000);
+      await auth.token();
+      vi.setSystemTime(now + 601_000);
+      const failure = await auth.token().catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(SignInRequiredError);
+      expect((failure as Error).message).toMatch(/without a new ID token/);
+      expect(tokenRequests[2]?.params.refresh_token).toBe("refresh-2");
+      expect(auth.signedIn).toBe(false);
+      await expect(auth.token()).rejects.toThrow(SignInRequiredError);
+      expect(tokenRequests).toHaveLength(3);
+    });
+
     it("without a refresh token, uses the token until it expires", async () => {
       const { auth, tokenRequests, signIn } = setup();
       await signIn();
