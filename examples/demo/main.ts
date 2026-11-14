@@ -45,6 +45,7 @@ interface Deployment extends KubeObject {
 
 interface Pod extends KubeObject {
   metadata?: ObjectMeta;
+  spec?: { containers?: { name: string }[] };
   status?: { phase?: string; conditions?: { type: string; status: string }[] };
 }
 
@@ -121,6 +122,11 @@ const statusElement = element("status");
 const countElement = element("count");
 const mapElement = element("map");
 const logElement = element("log");
+const podLogElement = element("pod-log");
+const podLogTitle = element("pod-log-title");
+const podLogStatus = element("pod-log-status");
+const podLogLines = element("pod-log-lines");
+const podLogEmpty = element("pod-log-empty");
 
 function make<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -326,8 +332,10 @@ function createGroup(namespace: string, group: Group, own: boolean): HTMLElement
         asked.set(key, ask);
         ask.replicas = replicas;
         ask.requests++;
+        // Through the scale subresource: the page needs no permission to
+        // change anything else about the deployment.
         resource
-          .patch(name, { spec: { replicas } }, { namespace })
+          .scale(name, replicas, { namespace })
           .catch((error: unknown) => {
             // What was asked for will not come; go by the informer again.
             ask.replicas = undefined;
@@ -368,7 +376,11 @@ function updateGroup(made: HTMLElement, group: Group): void {
     (pod) => {
       const shape = make("li", "pod");
       shape.dataset.pod = pod.metadata?.name ?? "";
-      shape.append(make("span", "visually-hidden"));
+      const open = make("button", "pod-button");
+      open.type = "button";
+      open.setAttribute("aria-label", `Show the log of ${pod.metadata?.name}`);
+      open.addEventListener("click", () => showLog(pod));
+      shape.append(make("span", "visually-hidden"), open);
       return shape;
     },
     (shape, pod) => {
@@ -376,9 +388,82 @@ function updateGroup(made: HTMLElement, group: Group): void {
       shape.dataset.state = state;
       shape.title = `${pod.metadata?.name}: ${state}`;
       (shape.firstElementChild as HTMLElement).textContent = shape.title;
+      (shape.lastElementChild as HTMLElement).setAttribute(
+        "aria-pressed",
+        String(pod.metadata?.uid === following?.uid),
+      );
     },
   );
 }
+
+// --- The log of a pod ----------------------------------------------------------
+
+/** The pod whose log is shown, and what ends the reading of it. */
+let following: { uid: string | undefined; stop: AbortController } | undefined;
+
+function setLogStatus(state: "connecting" | "synced" | "error", text: string): void {
+  podLogStatus.dataset.state = state;
+  podLogStatus.textContent = text;
+}
+
+function closeLog(): void {
+  following?.stop.abort();
+  following = undefined;
+  podLogElement.hidden = true;
+  for (const pressed of mapElement.querySelectorAll('.pod-button[aria-pressed="true"]')) {
+    pressed.setAttribute("aria-pressed", "false");
+  }
+}
+
+/** Shows the log of a pod's first container below the map and follows it. */
+function showLog(pod: Pod): void {
+  closeLog();
+  const { name = "", namespace, uid } = pod.metadata ?? {};
+  const stop = new AbortController();
+  following = { uid, stop };
+  mapElement
+    .querySelector(`.pod[data-pod="${CSS.escape(name)}"] .pod-button`)
+    ?.setAttribute("aria-pressed", "true");
+
+  podLogTitle.textContent = `Log of ${namespace}/${name}`;
+  podLogLines.replaceChildren();
+  podLogEmpty.hidden = false;
+  podLogElement.hidden = false;
+  setLogStatus("connecting", "Connecting");
+
+  const lines = client.resource(pods).followLog(name, {
+    namespace,
+    // A pod with several containers has to say which; the first will do here.
+    container: pod.spec?.containers?.[0]?.name,
+    // Short enough to stay on the page without a scrolling box of its own.
+    tailLines: 20,
+    signal: stop.signal,
+  });
+  (async () => {
+    setLogStatus("synced", "Following");
+    for await (const line of lines) {
+      podLogEmpty.hidden = true;
+      podLogLines.append(make("li", undefined, line));
+      while (podLogLines.children.length > 20) {
+        podLogLines.firstElementChild?.remove();
+      }
+    }
+    // The server ends the log when the container stops.
+    setLogStatus("connecting", "Ended");
+  })().catch((error: unknown) => {
+    if (stop.signal.aborted) {
+      return; // closed, or another pod was chosen
+    }
+    if (error instanceof SignInRequiredError) {
+      report(error);
+      return;
+    }
+    // For example a container that has not started yet.
+    setLogStatus("error", error instanceof Error ? error.message : String(error));
+  });
+}
+
+element("pod-log-close").addEventListener("click", closeLog);
 
 /**
  * Replica counts this page has asked for and the informer has not shown yet,
@@ -527,6 +612,7 @@ function addDeployment(namespace: string): void {
 function showSignedOut(notice?: string): void {
   followed?.stop();
   followed = undefined;
+  closeLog();
   asked.clear();
   mapElement.replaceChildren();
   logElement.replaceChildren();

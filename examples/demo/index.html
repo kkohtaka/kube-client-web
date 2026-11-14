@@ -56,6 +56,16 @@
         <h2 class="visually-hidden">Namespaces</h2>
         <ul class="map" id="map" data-testid="map" aria-label="Namespaces"></ul>
 
+        <section class="pod-log" id="pod-log" data-testid="pod-log" aria-labelledby="pod-log-title" hidden>
+          <header>
+            <h2 id="pod-log-title" data-testid="pod-log-title">Log</h2>
+            <span class="status" id="pod-log-status" role="status" data-testid="pod-log-status"></span>
+            <button type="button" id="pod-log-close" data-testid="pod-log-close">Close</button>
+          </header>
+          <ol class="lines" id="pod-log-lines" data-testid="pod-log-lines"></ol>
+          <p class="empty" id="pod-log-empty">No output yet</p>
+        </section>
+
         <h2>Events</h2>
         <ol class="log" id="log" data-testid="log"></ol>
       </section>
