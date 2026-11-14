@@ -1,9 +1,9 @@
 name: Dev container
 
 # Builds the dev container as a person's machine does, checks it and runs the
-# e2e tests inside it. This does not run on every push: only when something the container depends on changes, and
-# weekly to catch breakage from outside the repository (base image, features,
-# browser dependencies).
+# e2e tests inside it. This does not run on every push: only when something
+# the container depends on changes, and weekly to catch breakage from outside
+# the repository (base image, features, browser dependencies).
 on:
   push:
     paths:
@@ -27,6 +27,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The CLI does not do this itself. It fetches a feature by the digest in the
+  # lockfile and stops if nothing has that digest, but it installs whatever
+  # has it: with the digest of another version of the feature the build
+  # passes, whichever version the entry names.
+  lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the Dev Containers CLI
+        run: npm install -g @devcontainers/cli@0
+      - name: Check the lockfile against the registry
+        run: .devcontainer/check-lockfile.sh
+
   e2e:
     name: e2e (${{ matrix.arch }})
     strategy:
