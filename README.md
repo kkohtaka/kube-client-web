@@ -461,6 +461,31 @@ Things to know:
   at a host path that does not exist in the container, so Git does not work
   there.
 
+A change to the dev container, such as an update of a feature, needs a green
+run of the `Dev container` workflow and nothing else: it does not have to be
+rebuilt on someone's machine first. The workflow runs for every push that
+changes the container, and weekly. On amd64 and on arm64 (what Docker builds
+on Apple Silicon), it
+
+- creates the container from scratch with the commands above;
+- checks as the container's user that `node`, `pnpm` and `claude` start from a
+  login shell, a script and a terminal, in the versions of `.node-version` and
+  `package.json`; that Claude Code's configuration directory is writable; and
+  that the dependencies and the browsers are installed
+  (`.devcontainer/check-container.sh`);
+- runs the e2e, OpenID Connect, demo and fault tests in it;
+- creates the container from the commit before the change, starts the cluster
+  in it, then creates it again from the change over the same volumes, as a
+  machine that already had the container does, and repeats the checks and the
+  e2e tests. The volume with the Claude Code sign-in has to keep a file.
+
+It also checks that the digests in `.devcontainer/devcontainer-lock.json` are
+the ones the registry serves for the versions named there
+(`.devcontainer/check-lockfile.sh`).
+
+Not covered: signing in to Claude Code, VS Code and its extensions, and Docker
+Desktop on macOS.
+
 ### Without the dev container
 
 Install Node (see `.node-version`), pnpm, Docker, kind and kubectl on the host,
