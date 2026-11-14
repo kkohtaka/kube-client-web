@@ -68,3 +68,66 @@ jobs:
         run: >-
           devcontainer exec --workspace-folder . bash -c
           'pnpm e2e:up && pnpm test:e2e && pnpm test:oidc && pnpm test:demo && pnpm test:e2e:faults'
+
+  # A person's machine keeps the volumes of the container it had before:
+  # node_modules, Claude Code's configuration and the Docker daemon's data.
+  # This creates the container from the commit before the change, uses it, and
+  # then creates it again from this commit over those volumes.
+  rebuild:
+    name: rebuild (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-26.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The base commit has to be there to be checked out.
+          fetch-depth: 0
+      - name: Install the Dev Containers CLI
+        run: npm install -g @devcontainers/cli@0
+      - name: Create the container from the base commit
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # A push to main is compared with what main was before it, anything
+          # else with main. On a schedule that is this commit itself, which
+          # still shows that the container can be created a second time.
+          base=origin/main
+          if [ "${GITHUB_EVENT_NAME}" = push ] && [ "${GITHUB_REF}" = refs/heads/main ]; then
+            base="${BEFORE}"
+          fi
+          echo "Base commit: $(git rev-parse "${base}")"
+          git checkout --detach "${base}"
+          devcontainer up --workspace-folder .
+          # Leave behind what a container in use has: a cluster in the Docker
+          # daemon's volume and a file in Claude Code's.
+          devcontainer exec --workspace-folder . bash -c \
+            'pnpm e2e:up && touch "${CLAUDE_CONFIG_DIR}/kept-across-rebuild"'
+          docker volume ls
+      - name: Create the container again from this commit
+        run: |
+          git checkout --detach "${GITHUB_SHA}"
+          devcontainer up --workspace-folder . --remove-existing-container
+          docker volume ls
+          # The volumes are named after the workspace folder. Had the new
+          # container got volumes of its own, this job would test nothing.
+          for volume in kube-client-web-node-modules kube-client-web-claude dind-var-lib-docker; do
+            count="$(docker volume ls -q --filter "name=${volume}-" | wc -l)"
+            [ "${count}" -eq 1 ] ||
+              { echo "::error::expected one ${volume} volume, found ${count}"; exit 1; }
+          done
+      - name: Check the container as its user
+        run: |
+          container="$(docker ps -q --filter "label=devcontainer.local_folder=${GITHUB_WORKSPACE}")"
+          docker exec -u vscode "${container}" "/workspaces/${GITHUB_WORKSPACE##*/}/.devcontainer/check-container.sh"
+          docker exec -u vscode "${container}" sh -c 'test -e "${CLAUDE_CONFIG_DIR}/kept-across-rebuild"' ||
+            { echo "::error::the volume behind CLAUDE_CONFIG_DIR did not keep a file across the rebuild"; exit 1; }
+      - name: Run the e2e tests
+        run: devcontainer exec --workspace-folder . bash -c 'pnpm e2e:up && pnpm test:e2e'
