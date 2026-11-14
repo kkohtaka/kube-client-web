@@ -31,6 +31,18 @@ export function uniqueName(prefix: string): string {
 
 export interface Pod extends KubeObject {
   metadata?: ObjectMeta;
+  spec?: {
+    restartPolicy?: string;
+    terminationGracePeriodSeconds?: number;
+    containers: {
+      name: string;
+      image: string;
+      imagePullPolicy?: string;
+      command?: string[];
+      stdin?: boolean;
+    }[];
+  };
+  status?: { phase?: string };
 }
 
 export interface ConfigMap extends KubeObject {
@@ -40,6 +52,11 @@ export interface ConfigMap extends KubeObject {
 
 export interface Deployment extends KubeObject {
   metadata?: ObjectMeta;
+  spec?: {
+    replicas?: number;
+    selector: { matchLabels: Record<string, string> };
+    template: { metadata: { labels: Record<string, string> }; spec: Pod["spec"] };
+  };
 }
 
 export interface Widget extends KubeObject {
@@ -71,6 +88,27 @@ export const widgets = defineResource<Widget>({
   resource: "widgets",
   namespaced: true,
 });
+
+/**
+ * A pod spec that runs a shell script, in an image the node already has. The
+ * image has a shell and nothing to wait with, so scripts pause by reading
+ * from a standard input that never delivers anything: `read -t <seconds>`.
+ */
+export function shell(script: string): NonNullable<Pod["spec"]> {
+  return {
+    restartPolicy: "Never",
+    terminationGracePeriodSeconds: 0,
+    containers: [
+      {
+        name: "main",
+        image: inject("shellImage"),
+        imagePullPolicy: "Never",
+        command: ["sh", "-c", script],
+        stdin: true,
+      },
+    ],
+  };
+}
 
 /** Polls until the condition holds, so a failure names the state that was never reached. */
 export async function eventually(
