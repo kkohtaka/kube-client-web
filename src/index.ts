@@ -9,6 +9,7 @@ export {
 } from "./client.ts";
 export { ApiError, isGone } from "./errors.ts";
 export { Informer, type InformerEvents, type InformerOptions } from "./informer.ts";
+export type { LogOptions } from "./log.ts";
 export {
   createOidcAuth,
   OidcAuth,
@@ -33,6 +34,10 @@ export {
   type PatchOptions,
   type PatchType,
   ResourceClient,
+  type ScaleOptions,
+  SubresourceClient,
+  type SubresourceOptions,
+  type SubresourcePatchOptions,
   type UpdateOptions,
 } from "./resource-client.ts";
 export {
@@ -47,6 +52,7 @@ export type {
   ListMeta,
   ObjectMeta,
   OwnerReference,
+  Scale,
   Status,
   StatusCause,
   StatusDetails,

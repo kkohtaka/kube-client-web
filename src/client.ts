@@ -36,6 +36,8 @@ export interface RequestOptions {
   body?: unknown;
   /** `Content-Type` of the body. Defaults to `application/json`. */
   contentType?: string | undefined;
+  /** What to accept as an answer. Defaults to `application/json`. */
+  accept?: string | undefined;
   signal?: AbortSignal | undefined;
 }
 
@@ -75,7 +77,7 @@ export class KubeClient {
    * be 2xx, without reading the body. Throws {@link ApiError} otherwise.
    */
   async fetchResponse(options: RequestOptions): Promise<Response> {
-    const headers = new Headers({ Accept: "application/json" });
+    const headers = new Headers({ Accept: options.accept ?? "application/json" });
     const token = typeof this.#token === "function" ? await this.#token() : this.#token;
     if (token !== undefined) {
       headers.set("Authorization", `Bearer ${token}`);
