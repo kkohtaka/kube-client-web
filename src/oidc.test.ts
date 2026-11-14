@@ -394,14 +394,32 @@ describe("OidcAuth", () => {
       await expect(auth.token()).rejects.toThrow(SignInRequiredError);
     });
 
-    it("keeps the session when a renewal fails for another reason", async () => {
+    it("uses the current token while it is valid when a renewal fails for another reason", async () => {
+      const { auth, answers, tokenRequests, signIn } = setup();
+      await signIn({}, { refresh_token: "refresh-1" });
+      const current = await auth.token();
+      const renewed = idToken({ exp: now / 1000 + 1200 });
+      answers.push(new TypeError("Failed to fetch"), json({ error: "server_error" }, 500));
+      answers.push(json({ id_token: renewed }));
+
+      vi.setSystemTime(now + 541_000);
+      expect(await auth.token()).toBe(current);
+      expect(await auth.token()).toBe(current);
+      // Each call asked the provider.
+      expect(tokenRequests).toHaveLength(3);
+
+      expect(auth.signedIn).toBe(true);
+      expect(await auth.token()).toBe(renewed);
+    });
+
+    it("keeps the session when a renewal fails for another reason after the token expired", async () => {
       const { auth, answers, signIn } = setup();
       await signIn({}, { refresh_token: "refresh-1" });
       const renewed = idToken({ exp: now / 1000 + 1200 });
       answers.push(new TypeError("Failed to fetch"), json({ error: "server_error" }, 500));
       answers.push(json({ id_token: renewed }));
 
-      vi.setSystemTime(now + 541_000);
+      vi.setSystemTime(now + 601_000);
       await expect(auth.token()).rejects.toThrow(TypeError);
       await expect(auth.token()).rejects.toMatchObject({ error: "server_error" });
 
