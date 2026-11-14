@@ -48,6 +48,7 @@ export interface OwnerReference {
  */
 export interface Scale extends KubeObject {
   metadata?: ObjectMeta;
+  /** The server leaves `replicas` out when it is zero. */
   spec?: { replicas?: number };
   status?: {
     /** How many replicas there are now. */
