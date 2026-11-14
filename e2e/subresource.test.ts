@@ -155,9 +155,10 @@ describe("scale in the browser", () => {
     expect(scaled.spec?.replicas).toBe(3);
     expect((await resource.get(name, { namespace })).spec?.replicas).toBe(3);
 
-    // A dry run answers as if, and changes nothing.
+    // A dry run answers as if, and changes nothing. The server leaves a
+    // count of zero out of its answer.
     const dry = await resource.scale(name, 0, { namespace, dryRun: "All" });
-    expect(dry.spec?.replicas).toBe(0);
+    expect(dry.spec?.replicas ?? 0).toBe(0);
     expect((await resource.getScale(name, { namespace })).spec?.replicas).toBe(3);
   });
 });
