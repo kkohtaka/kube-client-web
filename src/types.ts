@@ -42,6 +42,21 @@ export interface OwnerReference {
   blockOwnerDeletion?: boolean;
 }
 
+/**
+ * The number of replicas of an object that can be scaled, as its `scale`
+ * subresource shows it. It has the same shape whatever the object is.
+ */
+export interface Scale extends KubeObject {
+  metadata?: ObjectMeta;
+  spec?: { replicas?: number };
+  status?: {
+    /** How many replicas there are now. */
+    replicas: number;
+    /** Label selector of the replicas, in the form `labelSelector` takes. */
+    selector?: string;
+  };
+}
+
 export interface ListMeta {
   resourceVersion?: string;
   /** Opaque token for fetching the next page. Absent or empty on the last page. */
