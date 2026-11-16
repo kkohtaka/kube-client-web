@@ -85,6 +85,51 @@ element("renew").addEventListener("click", () => {
   );
 });
 
+element("follow").addEventListener("click", () => {
+  // Dex issues tokens that live ten minutes. This object takes one for too
+  // old three seconds after it was issued, so to the informer below the token
+  // runs out every three seconds.
+  const hasty = createOidcAuth({ ...config, renewBeforeMs: 10 * 60 * 1000 - 3000 });
+  let last = "";
+  const informer = createClient({
+    baseUrl: __API_SERVER__,
+    token: async () => {
+      const token = await hasty.token();
+      if (token !== last) {
+        last = token;
+        element("follow-tokens").textContent = String(
+          Number(element("follow-tokens").textContent) + 1,
+        );
+      }
+      return token;
+    },
+  })
+    .resource(defineResource({ version: "v1", resource: "configmaps", namespaced: true }))
+    .informer({
+      namespace: "kube-client-web-e2e",
+      labelSelector: "e2e-oidc=follow",
+      // Short-lived connections, so the informer soon needs the token again.
+      watchTimeoutSeconds: 2,
+    });
+  const render = (): void => {
+    element("followed").textContent = informer
+      .list()
+      .map((object) => object.metadata?.name)
+      .join(" ");
+  };
+  informer.on("add", render);
+  informer.on("delete", render);
+  informer.on("error", (error) => {
+    element("follow-errors").textContent += `${String(error)}; `;
+  });
+  informer.start().then(
+    () => {
+      element("followed").dataset.synced = "true";
+    },
+    (error: unknown) => show("error", error),
+  );
+});
+
 try {
   await auth.completeSignIn();
   if (auth.signedIn) {

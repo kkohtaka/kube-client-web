@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { type Browser, type BrowserType, chromium, firefox, type Page, webkit } from "playwright";
 import { createServer, type ViteDevServer } from "vite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createConfigMap, kubectl } from "../kubectl.ts";
 
 /**
  * Signs in through Dex in a real browser. The page under test is ./index.html;
@@ -95,6 +96,44 @@ describe.each(browsers)("signing in with OpenID Connect in %s", (_name, type) =>
 
     expect(await settled()).toBe("signed-in");
     expect(await page.locator("#whoami").textContent()).toBe("oidc:jane@example.com");
+  });
+
+  it("follows objects across a pause of the page that outlasts its token", {
+    timeout: 90_000,
+  }, async () => {
+    const configMap = `oidc-follow-${Date.now()}`;
+    const namespace = "kube-client-web-e2e";
+    const tokens = async (): Promise<number> =>
+      Number(await page.locator("#follow-tokens").textContent());
+
+    // The informer of the page takes its token for expired three seconds
+    // after it got it.
+    await page.locator("#follow").click();
+    // The element is empty, which a locator takes for hidden.
+    await page.locator('#followed[data-synced="true"]').waitFor({ state: "attached" });
+    const before = await tokens();
+
+    try {
+      // Keep the page from running for five seconds, as if the browser had
+      // frozen it in the background; see e2e/background.test.ts.
+      const stalled = page.evaluate(() => {
+        const until = performance.now() + 5000;
+        while (performance.now() < until) {
+          // Nothing: being busy is the point.
+        }
+      });
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await createConfigMap(namespace, configMap, { "e2e-oidc": "follow" });
+      await stalled;
+
+      // Nobody touches the page; it finds the object with a token it had to
+      // get first.
+      await page.locator("#followed", { hasText: configMap }).waitFor({ timeout: 60_000 });
+      expect(await tokens()).toBeGreaterThan(before);
+      expect(await page.locator("#follow-errors").textContent()).toBe("");
+    } finally {
+      await kubectl("-n", namespace, "delete", "configmap", configMap, "--ignore-not-found");
+    }
   });
 
   it("is signed out after signing out, also after a reload", async () => {

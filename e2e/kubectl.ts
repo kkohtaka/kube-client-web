@@ -18,3 +18,16 @@ export async function onControlPlane(script: string): Promise<string> {
   const { stdout } = await run("docker", ["exec", `${cluster}-control-plane`, "sh", "-c", script]);
   return stdout.trim();
 }
+
+/** Creates an empty ConfigMap with the given labels. */
+export async function createConfigMap(
+  namespace: string,
+  name: string,
+  labels: Record<string, string>,
+): Promise<void> {
+  await kubectl("-n", namespace, "create", "configmap", name);
+  const pairs = Object.entries(labels).map(([key, value]) => `${key}=${value}`);
+  // `kubectl create configmap` takes no labels. A watch with a label selector
+  // reports the object as added once it matches.
+  await kubectl("-n", namespace, "label", "configmap", name, ...pairs);
+}

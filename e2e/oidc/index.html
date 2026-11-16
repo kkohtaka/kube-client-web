@@ -11,11 +11,15 @@
     <p>API server sees: <span id="whoami"></span></p>
     <p>ConfigMaps: <span id="configmaps"></span></p>
     <p>Renewals: <span id="renewals">0</span></p>
+    <p>Followed ConfigMaps: <span id="followed" data-synced="false"></span></p>
+    <p>Tokens used to follow them: <span id="follow-tokens">0</span></p>
+    <p>Errors following them: <span id="follow-errors"></span></p>
     <p id="error"></p>
     <button id="sign-in" type="button">Sign in</button>
     <button id="sign-out" type="button">Sign out</button>
     <button id="renew" type="button">Renew</button>
     <button id="call" type="button">Call the API server</button>
+    <button id="follow" type="button">Follow ConfigMaps</button>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
