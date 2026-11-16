@@ -13,6 +13,13 @@ export async function kubectl(...args: string[]): Promise<string> {
   return stdout.trim();
 }
 
+/** Runs kubectl with a manifest on its standard input, such as for `create -f -`. */
+export async function kubectlWith(manifest: object, ...args: string[]): Promise<string> {
+  const running = run("kubectl", ["--context", `kind-${cluster}`, ...args]);
+  running.child.stdin?.end(JSON.stringify(manifest));
+  return (await running).stdout.trim();
+}
+
 /** Runs a shell command inside the cluster's control plane node. */
 export async function onControlPlane(script: string): Promise<string> {
   const { stdout } = await run("docker", ["exec", `${cluster}-control-plane`, "sh", "-c", script]);
