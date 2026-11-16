@@ -76,7 +76,11 @@ subjects:
 # What examples/demo lets its user do, on top of reading everything: make and
 # remove namespaces, and run and scale deployments in them. Scaling goes
 # through the scale subresource, so the user may not change a deployment in
-# any other way. Only for a local cluster.
+# any other way.
+#
+# A role cannot tell the demo's objects from others, so this one covers the
+# whole cluster. The admission policy at the end of this file narrows it to
+# what the demo made.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -104,3 +108,87 @@ subjects:
   - kind: User
     apiGroup: rbac.authorization.k8s.io
     name: oidc:jane@example.com
+---
+# Narrows the role above to the objects of the demo, which carry the label
+# app.kubernetes.io/managed-by: kube-client-web-demo. Its user may
+#
+# - create a namespace with that label, if the namespace also enforces the
+#   "restricted" Pod Security Standard, so that the deployments in it cannot
+#   run pods that reach the node;
+# - delete a namespace with that label;
+# - create and delete deployments with that label in such a namespace;
+# - scale deployments in such a namespace. A Scale does not carry the labels
+#   of its deployment, so here the namespace is all that can be checked.
+#
+# Everything else that the role would allow is refused. The namespace of the
+# e2e tests is left alone: there the same user holds the "edit" role.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: kube-client-web-demo
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["namespaces"]
+      - apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE", "DELETE"]
+        resources: ["deployments", "deployments/scale"]
+  matchConditions:
+    - name: demo-user
+      expression: request.userInfo.username == 'oidc:jane@example.com'
+    - name: not-the-e2e-namespace
+      expression: >-
+        request.resource.resource == 'namespaces' ||
+        request.namespace != 'kube-client-web-e2e'
+  variables:
+    # A request to delete has no new object.
+    - name: target
+      expression: "request.operation == 'DELETE' ? oldObject : object"
+    - name: targetIsDemo
+      expression: >-
+        has(variables.target.metadata.labels) &&
+        'app.kubernetes.io/managed-by' in variables.target.metadata.labels &&
+        variables.target.metadata.labels['app.kubernetes.io/managed-by'] == 'kube-client-web-demo'
+    - name: namespaceIsDemo
+      expression: >-
+        namespaceObject != null &&
+        has(namespaceObject.metadata.labels) &&
+        'app.kubernetes.io/managed-by' in namespaceObject.metadata.labels &&
+        namespaceObject.metadata.labels['app.kubernetes.io/managed-by'] == 'kube-client-web-demo'
+  validations:
+    - expression: >-
+        request.resource.resource != 'namespaces' || variables.targetIsDemo
+      message: the demo's user may only create and delete namespaces labelled app.kubernetes.io/managed-by=kube-client-web-demo
+      reason: Forbidden
+    - expression: >-
+        request.resource.resource != 'namespaces' ||
+        request.operation != 'CREATE' ||
+        (has(object.metadata.labels) &&
+        'pod-security.kubernetes.io/enforce' in object.metadata.labels &&
+        object.metadata.labels['pod-security.kubernetes.io/enforce'] == 'restricted')
+      message: the demo's user may only create namespaces labelled pod-security.kubernetes.io/enforce=restricted
+      reason: Forbidden
+    - expression: >-
+        request.resource.resource != 'deployments' || variables.namespaceIsDemo
+      message: the demo's user may only change deployments in namespaces labelled app.kubernetes.io/managed-by=kube-client-web-demo
+      reason: Forbidden
+    # A request for the deployment itself names no subresource.
+    - expression: >-
+        request.resource.resource != 'deployments' ||
+        (has(request.subResource) && request.subResource != '') ||
+        variables.targetIsDemo
+      message: the demo's user may only create and delete deployments labelled app.kubernetes.io/managed-by=kube-client-web-demo
+      reason: Forbidden
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: kube-client-web-demo
+spec:
+  policyName: kube-client-web-demo
+  validationActions: ["Deny"]

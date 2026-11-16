@@ -32,7 +32,9 @@ kubectl --context kind-kube-client-web -n hello scale deployment web --replicas=
 kubectl --context kind-kube-client-web delete namespace hello
 ```
 
-The page only offers to change what it created itself. `pnpm e2e:down` removes
+The page only offers to change what it created itself, and the cluster lets
+its user change nothing else: see
+[What the user may change](#what-the-user-may-change). `pnpm e2e:down` removes
 the cluster.
 
 ## What to look at
@@ -72,8 +74,37 @@ application.
   It also means the browser speaks HTTP/1.1 here, with its limit of six
   connections, of which the three watches hold three and a log that is
   followed a fourth.
-- **The provider knows one user with a well-known password,** and that user
-  may create and delete namespaces and deployments, and scale deployments,
-  anywhere in the cluster
-  ([`e2e/dex.yaml`](../../e2e/dex.yaml), [`e2e/rbac.yaml`](../../e2e/rbac.yaml)).
-  The cluster only listens on `127.0.0.1`.
+- **The provider knows one user with a well-known password**
+  ([`e2e/dex.yaml`](../../e2e/dex.yaml)). The cluster only listens on
+  `127.0.0.1`.
+- **That user may read everything in the cluster,** secrets excepted. A page
+  for real users shows them what they need.
+
+## What the user may change
+
+A page that changes a cluster should be able to change no more than it offers
+to. Roles alone cannot say that here: the demo makes its own namespaces, and a
+role cannot be limited to "the namespaces this page made". So
+[`e2e/rbac.yaml`](../../e2e/rbac.yaml) does it in two steps.
+
+- A `ClusterRole` lets the user create and delete namespaces and deployments,
+  and scale deployments, anywhere.
+- A `ValidatingAdmissionPolicy` then refuses those requests unless they are
+  about the demo's own objects, which carry the label
+  `app.kubernetes.io/managed-by: kube-client-web-demo`: a namespace with the
+  label, or a deployment with the label in such a namespace. Scaling is
+  allowed for every deployment in such a namespace, because the `Scale` the
+  request carries does not have the deployment's labels.
+
+Creating deployments means running containers, and a container can be asked
+to run with the rights of the node. The policy therefore lets the user create
+a namespace only if it enforces the `restricted`
+[Pod Security Standard](https://kubernetes.io/docs/concepts/security/pod-security-standards/),
+and the page asks for that.
+
+[`e2e/oidc/permissions.test.ts`](../../e2e/oidc/permissions.test.ts) checks
+what is allowed and what is refused. The policy needs Kubernetes 1.30 or
+later.
+
+The two belong together. The role without the policy lets its user delete any
+namespace of the cluster; do not copy one without the other.

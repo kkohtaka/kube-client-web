@@ -580,7 +580,14 @@ function shortId(): string {
 element("create-namespace").addEventListener("click", () => {
   client
     .resource(namespaces)
-    .create({ metadata: { name: `demo-${shortId()}`, labels: { [ownLabel]: ownValue } } })
+    .create({
+      metadata: {
+        name: `demo-${shortId()}`,
+        // The cluster lets the demo's user create a namespace only if pods in
+        // it are held to the "restricted" Pod Security Standard.
+        labels: { [ownLabel]: ownValue, "pod-security.kubernetes.io/enforce": "restricted" },
+      },
+    })
     .catch(report);
 });
 
@@ -598,7 +605,21 @@ function addDeployment(namespace: string): void {
           metadata: { labels },
           spec: {
             // Does nothing, which is all the demo needs of a container.
-            containers: [{ name: "pause", image: "registry.k8s.io/pause:3.10" }],
+            // e2e/cluster-up.sh puts this image on the node. The security
+            // context is what the "restricted" Pod Security Standard asks for.
+            containers: [
+              {
+                name: "pause",
+                image: "registry.k8s.io/pause:3.10",
+                imagePullPolicy: "IfNotPresent",
+                securityContext: {
+                  allowPrivilegeEscalation: false,
+                  capabilities: { drop: ["ALL"] },
+                  runAsNonRoot: true,
+                  seccompProfile: { type: "RuntimeDefault" },
+                },
+              },
+            ],
             terminationGracePeriodSeconds: 2,
           },
         },
