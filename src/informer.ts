@@ -2,6 +2,7 @@ import { Backoff, type BackoffOptions, sleep } from "./backoff.ts";
 import { isGone } from "./errors.ts";
 import type { ResourceClient } from "./resource-client.ts";
 import type { KubeObject } from "./types.ts";
+import { pageReturns } from "./visibility.ts";
 import type { WatchEvent } from "./watch.ts";
 
 export interface InformerOptions {
@@ -25,6 +26,15 @@ export interface InformerOptions {
   idleTimeoutMs?: number | undefined;
   /** Delays between attempts after a failure. */
   backoff?: BackoffOptions | undefined;
+  /**
+   * When the page becomes visible again after it was hidden for at least this
+   * long, replace the watch connection right away, and do not wait any longer
+   * before the next attempt. The informer then catches up as soon as the user
+   * looks at the page, also when the connection died unnoticed in the
+   * meantime. Defaults to 10000; `Infinity` switches it off. Has no effect
+   * where there is no `document`.
+   */
+  reconnectAfterHiddenMs?: number | undefined;
 }
 
 export interface InformerEvents<T> {
@@ -144,7 +154,10 @@ export class Informer<T extends KubeObject> {
   async #loop(run: Run, onSynced: () => void): Promise<void> {
     const { signal } = run.abort;
     const { namespace, labelSelector, fieldSelector, idleTimeoutMs } = this.#options;
+    const { reconnectAfterHiddenMs = 10_000 } = this.#options;
     const backoff = new Backoff(this.#options.backoff);
+    const returns = pageReturns(reconnectAfterHiddenMs);
+    signal.addEventListener("abort", () => returns.stop(), { once: true });
 
     while (!signal.aborted) {
       let watched = false;
@@ -162,6 +175,7 @@ export class Informer<T extends KubeObject> {
             this.#options.watchTimeoutSeconds ?? Math.round(300 + Math.random() * 300),
           idleTimeoutMs,
           backoff: this.#options.backoff,
+          reconnectAfterHiddenMs,
           signal,
           onReconnect: ({ error }) => {
             if (error !== undefined) {
@@ -189,9 +203,10 @@ export class Informer<T extends KubeObject> {
         }
       }
       try {
-        await sleep(backoff.next(), signal);
+        await sleep(backoff.next(), AbortSignal.any([signal, returns.signal]));
       } catch {
-        return;
+        // Either the informer was stopped, which ends the loop, or the page
+        // is back in view, which is the moment to try again.
       }
     }
   }

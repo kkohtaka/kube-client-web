@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { fakePage } from "./fake-page.ts";
 import {
   ApiError,
   createClient,
@@ -147,6 +148,7 @@ function settled<T>(promise: Promise<T>): Promise<T> {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("watch", () => {
@@ -427,6 +429,140 @@ describe("watchWithReconnect", () => {
     expect((await first).value).toEqual(added("a", "1"));
     expect(errors).toEqual([expect.any(WatchTimeoutError)]);
     await events.return();
+  });
+
+  it("replaces the connection when the page comes back from the background", async () => {
+    const page = fakePage();
+    const { server, resource } = setup();
+    const infos: ReconnectInfo[] = [];
+    const events = resource.watchWithReconnect({
+      resourceVersion: "5",
+      backoff,
+      reconnectAfterHiddenMs: 0,
+      onReconnect: (info) => infos.push(info),
+    });
+    const next = events.next();
+    const first = await server.connection(0);
+    first.send(added("a", "6"));
+    expect((await next).value).toEqual(added("a", "6"));
+
+    const pending = events.next();
+    page.hide();
+    expect(first.signal.aborted).toBe(false);
+    page.show();
+    expect(first.signal.aborted).toBe(true);
+
+    // Not a failure: no delay, and nothing to report but the reconnection.
+    const second = await server.connection(1);
+    expect(second.url.searchParams.get("resourceVersion")).toBe("6");
+    second.send(added("b", "7"));
+    expect((await pending).value).toEqual(added("b", "7"));
+    expect(infos).toEqual([{ error: undefined, delayMs: 0, resourceVersion: "6" }]);
+
+    await events.return();
+    expect(page.listeners).toBe(0);
+  });
+
+  it("tries again at once when the page comes back while it waits after a failure", async () => {
+    vi.useFakeTimers();
+    const page = fakePage();
+    const { server, resource } = setup();
+    server.answers.push(new TypeError("Failed to fetch"));
+    const events = resource.watchWithReconnect({
+      backoff: { initialDelayMs: 60_000, jitter: 0 },
+      reconnectAfterHiddenMs: 1000,
+    });
+    const first = events.next();
+    await server.connection(0);
+    await vi.advanceTimersByTimeAsync(100);
+
+    page.hide();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(server.connections).toHaveLength(1);
+    page.show();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(server.connections).toHaveLength(2);
+
+    (server.connections[1] as Connection).send(added("a", "1"));
+    expect((await first).value).toEqual(added("a", "1"));
+    await events.return();
+  });
+
+  it("keeps its connection when the page was hidden only briefly, or when told to", async () => {
+    vi.useFakeTimers();
+    const page = fakePage();
+    const { server, resource } = setup();
+    const brief = resource.watchWithReconnect({ backoff });
+    const off = resource.watchWithReconnect({
+      backoff,
+      reconnectAfterHiddenMs: Number.POSITIVE_INFINITY,
+    });
+    const pending = [brief.next(), off.next()];
+    await server.connection(1);
+
+    // The default is ten seconds.
+    page.hide();
+    await vi.advanceTimersByTimeAsync(9999);
+    page.show();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(server.connections).toHaveLength(2);
+
+    page.hide();
+    await vi.advanceTimersByTimeAsync(10_000);
+    page.show();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(server.connections).toHaveLength(3);
+    expect(server.connections.map((connection) => connection.signal.aborted)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+
+    (server.connections[2] as Connection).send(added("a", "1"));
+    (server.connections[1] as Connection).send(added("a", "1"));
+    await Promise.all(pending);
+    await brief.return();
+    await off.return();
+  });
+
+  it("ends with the reason it was aborted with, also right after the page came back", async () => {
+    const page = fakePage();
+    const { server, resource } = setup();
+    const stop = new AbortController();
+    const events = resource.watchWithReconnect({
+      backoff,
+      reconnectAfterHiddenMs: 0,
+      signal: stop.signal,
+    });
+    const first = events.next();
+    await server.connection(0);
+
+    page.hide();
+    page.show();
+    stop.abort(new Error("enough"));
+    await expect(settled(first)).rejects.toThrow("enough");
+    expect(page.listeners).toBe(0);
+  });
+
+  it("ends with the reason it was aborted with when the page came back while it waited", async () => {
+    const page = fakePage();
+    const { server, resource } = setup();
+    server.answers.push(new TypeError("Failed to fetch"));
+    const stop = new AbortController();
+    const events = resource.watchWithReconnect({
+      backoff: { initialDelayMs: 60_000, jitter: 0 },
+      reconnectAfterHiddenMs: 0,
+      signal: stop.signal,
+    });
+    const first = events.next();
+    await server.connection(0);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    page.hide();
+    page.show();
+    stop.abort(new Error("enough"));
+    await expect(settled(first)).rejects.toThrow("enough");
+    expect(server.connections).toHaveLength(1);
   });
 
   it("retries server errors and honors the delay a throttling server asks for", async () => {

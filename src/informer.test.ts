@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { fakePage } from "./fake-page.ts";
 import { fakeServer } from "./fake-server.ts";
 import { createClient, defineResource, type Informer, type InformerOptions } from "./index.ts";
 import type { KubeObject } from "./types.ts";
@@ -298,6 +299,56 @@ describe("Informer", () => {
     expect(server.listRequests[0]?.headers.get("Authorization")).toBe("Bearer token-1");
     expect(first.headers.get("Authorization")).toBe("Bearer token-2");
     expect(second.headers.get("Authorization")).toBe("Bearer token-3");
+  });
+
+  it("replaces the watch when the page comes back from the background, without listing again", async () => {
+    const page = fakePage();
+    const { server, informer, log, errors } = setup({ reconnectAfterHiddenMs: 0 });
+    server.lists.push(list("10", [cm("a", "3")]));
+    await informer.start();
+    const first = await server.watch(0);
+    first.send({ type: "ADDED", object: cm("b", "11") });
+    await settle();
+
+    page.hide();
+    page.show();
+    expect(first.signal.aborted).toBe(true);
+    const second = await server.watch(1);
+    expect(second.url.searchParams.get("resourceVersion")).toBe("11");
+    second.send({ type: "DELETED", object: cm("a", "12") });
+    await settle();
+
+    expect(log).toEqual([
+      ["add", "a"],
+      ["add", "b"],
+      ["delete", "a"],
+    ]);
+    expect(server.listRequests).toHaveLength(1);
+    expect(errors).toEqual([]);
+
+    informer.stop();
+    await settle();
+    expect(page.listeners).toBe(0);
+  });
+
+  it("lists again at once when the page comes back while it waits after a failure", async () => {
+    vi.useFakeTimers();
+    const page = fakePage();
+    const { server, informer } = setup({
+      backoff: { initialDelayMs: 60_000, jitter: 0 },
+      reconnectAfterHiddenMs: 1000,
+    });
+    server.lists.push(new TypeError("Failed to fetch"), list("10", [cm("a", "3")]));
+    const started = informer.start();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(server.listRequests).toHaveLength(1);
+
+    page.hide();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(server.listRequests).toHaveLength(1);
+    page.show();
+    await started;
+    expect(server.listRequests).toHaveLength(2);
   });
 
   it("closes the connection and goes quiet when stopped", async () => {
