@@ -2,6 +2,7 @@ import { Backoff, type BackoffOptions, sleep } from "./backoff.ts";
 import type { KubeClient } from "./client.ts";
 import { ApiError } from "./errors.ts";
 import type { KubeObject, Status } from "./types.ts";
+import { pageReturns } from "./visibility.ts";
 
 /** One change reported by a watch. */
 export type WatchEvent<T> =
@@ -60,6 +61,16 @@ export interface ReconnectingWatchOptions extends WatchOptions {
   backoff?: BackoffOptions | undefined;
   /** Called each time the connection ended and the watch is about to reconnect. */
   onReconnect?: ((info: ReconnectInfo) => void) | undefined;
+  /**
+   * When the page becomes visible again after it was hidden for at least this
+   * long, replace the connection right away, and do not wait any longer before
+   * the next attempt. A connection may have died unnoticed while the page was
+   * in a background tab or the machine slept; this way the watch catches up
+   * as soon as the user looks at the page, not at the next deadline. Replacing
+   * a connection loses nothing. Defaults to 10000; `Infinity` switches it off.
+   * Has no effect where there is no `document`.
+   */
+  reconnectAfterHiddenMs?: number | undefined;
 }
 
 /**
@@ -190,38 +201,72 @@ export async function* watchWithReconnect<T extends KubeObject>(
   path: string,
   options: Omit<ReconnectingWatchOptions, "namespace">,
 ): AsyncGenerator<WatchEvent<T>, void, undefined> {
-  const { backoff: backoffOptions, onReconnect, ...watchOptions } = options;
+  const {
+    backoff: backoffOptions,
+    onReconnect,
+    reconnectAfterHiddenMs = 10_000,
+    ...watchOptions
+  } = options;
   const { signal } = watchOptions;
   const backoff = new Backoff(backoffOptions);
   let resourceVersion = watchOptions.resourceVersion;
+  const returns = pageReturns(reconnectAfterHiddenMs);
+  const orReturned = (returned: AbortSignal): AbortSignal =>
+    signal ? AbortSignal.any([signal, returned]) : returned;
 
-  for (;;) {
-    let progressed = false;
-    let failure: unknown;
-    let failed = false;
-    try {
-      for await (const event of watchOnce<T>(client, path, { ...watchOptions, resourceVersion })) {
-        progressed = true;
-        backoff.reset();
-        resourceVersion = event.object.metadata?.resourceVersion ?? resourceVersion;
-        yield event;
+  try {
+    for (;;) {
+      let progressed = false;
+      let failure: unknown;
+      let failed = false;
+      const returned = returns.signal;
+      try {
+        const events = watchOnce<T>(client, path, {
+          ...watchOptions,
+          resourceVersion,
+          signal: orReturned(returned),
+        });
+        for await (const event of events) {
+          progressed = true;
+          backoff.reset();
+          resourceVersion = event.object.metadata?.resourceVersion ?? resourceVersion;
+          yield event;
+        }
+      } catch (error) {
+        if (signal?.aborted) {
+          throw signal.reason;
+        }
+        if (returned.aborted) {
+          // The page is back in view. The connection may be fine, but there
+          // is no telling, so it is replaced without counting as a failure.
+          onReconnect?.({ error: undefined, delayMs: 0, resourceVersion });
+          continue;
+        }
+        if (!isRetryable(error)) {
+          throw error;
+        }
+        failure = error;
+        failed = true;
       }
-    } catch (error) {
-      if (signal?.aborted || !isRetryable(error)) {
-        throw error;
-      }
-      failure = error;
-      failed = true;
-    }
 
-    // A connection that delivered events and was then closed by the server is
-    // the normal end of a watch; anything else waits before the next attempt.
-    let delayMs = failed || !progressed ? backoff.next() : 0;
-    if (failure instanceof ApiError) {
-      delayMs = Math.max(delayMs, (failure.body?.details?.retryAfterSeconds ?? 0) * 1000);
+      // A connection that delivered events and was then closed by the server is
+      // the normal end of a watch; anything else waits before the next attempt.
+      let delayMs = failed || !progressed ? backoff.next() : 0;
+      if (failure instanceof ApiError) {
+        delayMs = Math.max(delayMs, (failure.body?.details?.retryAfterSeconds ?? 0) * 1000);
+      }
+      onReconnect?.({ error: failure, delayMs, resourceVersion });
+      try {
+        await sleep(delayMs, orReturned(returns.signal));
+      } catch {
+        if (signal?.aborted) {
+          throw signal.reason;
+        }
+        // The page is back in view: try now.
+      }
     }
-    onReconnect?.({ error: failure, delayMs, resourceVersion });
-    await sleep(delayMs, signal);
+  } finally {
+    returns.stop();
   }
 }
 
