@@ -35,6 +35,27 @@ if ! kubectl --context "${context}" -n kube-system get pods -l component=kube-ap
   exit 1
 fi
 
+# The deployments of the demo (examples/demo/main.ts) run this image. It is
+# put on the node here, where a failed pull can be tried again, so that the
+# demo and its test do not depend on reaching the registry.
+demo_image=registry.k8s.io/pause:3.10
+node="${name}-control-plane"
+if docker exec "${node}" crictl inspecti "${demo_image}" >/dev/null 2>&1; then
+  echo "The node already has ${demo_image}"
+else
+  echo "Pulling ${demo_image} onto the node"
+  for attempt in 1 2 3 4 5; do
+    if docker exec "${node}" crictl pull "${demo_image}"; then
+      break
+    fi
+    if [ "${attempt}" = 5 ]; then
+      echo "Could not pull ${demo_image} onto the node." >&2
+      exit 1
+    fi
+    sleep $((attempt * 5))
+  done
+fi
+
 kubectl --context "${context}" apply -f crd.yaml -f rbac.yaml
 kubectl --context "${context}" wait crd/widgets.e2e.kube-client-web.test --for=condition=Established --timeout=60s
 kubectl --context "${context}" -n kube-system wait pod --all --for=condition=Ready --timeout=180s
