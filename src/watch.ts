@@ -4,6 +4,11 @@ import { ApiError } from "./errors.ts";
 import type { KubeObject, Status } from "./types.ts";
 import { pageReturns } from "./visibility.ts";
 
+/** A timer that fires this much after it was due shows that the page did not run. */
+const TIMER_LATE_MS = 2000;
+/** How long a page that did not run gets to read what its connection holds. */
+const CATCH_UP_MS = 2000;
+
 /** One change reported by a watch. */
 export type WatchEvent<T> =
   | { type: "ADDED" | "MODIFIED" | "DELETED"; object: T }
@@ -29,7 +34,9 @@ export interface WatchOptions {
   /**
    * Ask the server to end the watch after this many seconds. If the connection
    * is still open `closeGraceMs` after that, it is taken for dead and the watch
-   * gives up with a {@link WatchTimeoutError}.
+   * gives up with a {@link WatchTimeoutError}. A page that did not run when
+   * that moment came, in a background tab or while the machine slept, first
+   * gets two seconds to read what the connection holds.
    */
   timeoutSeconds?: number | undefined;
   /**
@@ -96,7 +103,7 @@ export async function* watchOnce<T extends KubeObject>(
   } = options;
   // The server ends the watch by itself after timeoutSeconds. A connection
   // that outlives that has died without the browser noticing.
-  const overdueAt =
+  let overdueAt =
     query.timeoutSeconds === undefined
       ? Number.POSITIVE_INFINITY
       : Date.now() + query.timeoutSeconds * 1000 + closeGraceMs;
@@ -135,8 +142,21 @@ export async function* watchOnce<T extends KubeObject>(
       idle <= untilOverdue
         ? `the watch received nothing for ${idle} ms`
         : "the server did not end the watch when it was due";
-    const timer = setTimeout(
-      () => teardown.abort(new WatchTimeoutError(message)),
+    const giveUp = (): void => teardown.abort(new WatchTimeoutError(message));
+    const dueAt = Date.now() + Math.max(delay, 0);
+    let timer = setTimeout(
+      () => {
+        if (Date.now() - dueAt < TIMER_LATE_MS) {
+          giveUp();
+          return;
+        }
+        // The timer is late: the page did not run for a while, because its
+        // tab was in the background or the machine slept. Nothing the server
+        // sent meanwhile could be read either, so the silence says nothing
+        // yet. Let the page catch up on the connection before judging it.
+        overdueAt = Math.max(overdueAt, Date.now() + CATCH_UP_MS);
+        timer = setTimeout(giveUp, CATCH_UP_MS);
+      },
       Math.max(delay, 0),
     );
     try {
