@@ -6,10 +6,13 @@ export class OidcError extends Error {
   override readonly name: string = "OidcError";
   /** Error code from the provider, for example `access_denied`, when it sent one. */
   readonly error: string | undefined;
+  /** HTTP status of the provider's answer, when the error came with one. */
+  readonly status: number | undefined;
 
-  constructor(message: string, error?: string, options?: ErrorOptions) {
+  constructor(message: string, error?: string, options?: ErrorOptions & { status?: number }) {
     super(message, options);
     this.error = error;
+    this.status = options?.status;
   }
 }
 
@@ -20,6 +23,21 @@ export class OidcError extends Error {
  */
 export class SignInRequiredError extends Error {
   override readonly name: string = "SignInRequiredError";
+}
+
+/**
+ * Whether the provider has refused to renew a session for good, as opposed to
+ * having failed to answer. `invalid_grant` is what OAuth 2.0 has it say about
+ * a refresh token it no longer honors, but providers name other errors too:
+ * Dex answers `invalid_request` for a refresh token that was replaced. So
+ * every error the token endpoint reports the way OAuth 2.0 defines, with
+ * status 400 or 401 and an error code, counts. Asking again would not help.
+ */
+function refusesRenewal(error: unknown): error is OidcError {
+  if (!(error instanceof OidcError) || error.error === undefined) {
+    return false;
+  }
+  return error.error === "invalid_grant" || error.status === 400 || error.status === 401;
 }
 
 /** Where {@link OidcAuth} keeps its state. `sessionStorage` and `localStorage` fit. */
@@ -323,7 +341,7 @@ export class OidcAuth {
         refresh_token: session.refreshToken,
       });
     } catch (error) {
-      if (error instanceof OidcError && error.error === "invalid_grant") {
+      if (refusesRenewal(error)) {
         // The provider no longer honors the refresh token. Where tabs cannot
         // take turns, that may be because another one has just used it.
         const current = this.#read<Session>("session");
@@ -385,6 +403,7 @@ export class OidcAuth {
       throw new OidcError(
         description ?? error ?? `the token request failed with status ${response.status}`,
         error,
+        { status: response.status },
       );
     }
     const refreshToken = typeof body?.refresh_token === "string" ? body.refresh_token : undefined;
