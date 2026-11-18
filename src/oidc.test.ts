@@ -394,6 +394,44 @@ describe("OidcAuth", () => {
       await expect(auth.token()).rejects.toThrow(SignInRequiredError);
     });
 
+    it.each([
+      ["invalid_request", 400],
+      ["invalid_client", 401],
+      ["unauthorized_client", 400],
+    ])(
+      "asks to sign in again when the provider refuses to renew with %s",
+      async (error, status) => {
+        const { auth, answers, tokenRequests, signIn } = setup();
+        await signIn({}, { refresh_token: "refresh-1" });
+        answers.push(json({ error, error_description: "Refresh token is invalid" }, status));
+
+        // The current token is still valid, but the session cannot go on.
+        vi.setSystemTime(now + 541_000);
+        const failed = auth.token();
+        await expect(failed).rejects.toThrow(SignInRequiredError);
+        await expect(failed).rejects.toMatchObject({ cause: { error, status } });
+
+        // The provider is not asked again.
+        expect(auth.signedIn).toBe(false);
+        await expect(auth.token()).rejects.toThrow(SignInRequiredError);
+        expect(tokenRequests).toHaveLength(2);
+      },
+    );
+
+    it("keeps the session when the answer to a renewal is not the provider's refusal", async () => {
+      const { auth, answers, signIn } = setup();
+      await signIn({}, { refresh_token: "refresh-1" });
+      const current = await auth.token();
+      // Something in between answered, or the provider is in trouble.
+      answers.push(new Response("Bad Request", { status: 400 }));
+      answers.push(json({ error: "temporarily_unavailable" }, 503));
+
+      vi.setSystemTime(now + 541_000);
+      expect(await auth.token()).toBe(current);
+      expect(await auth.token()).toBe(current);
+      expect(auth.signedIn).toBe(true);
+    });
+
     it("uses the current token while it is valid when a renewal fails for another reason", async () => {
       const { auth, answers, tokenRequests, signIn } = setup();
       await signIn({}, { refresh_token: "refresh-1" });

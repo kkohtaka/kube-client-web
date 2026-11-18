@@ -328,6 +328,9 @@ Things to know:
   throws a `SignInRequiredError`. Requests then fail with it, and informers
   report it as an `error` event and keep trying; call `auth.signIn()` when you
   see it.
+  The session cannot be renewed any more once the provider refuses its refresh
+  token: with `invalid_grant`, or with any other error that the token endpoint
+  reports with status 400 or 401. Providers differ in the error they name.
 - The session is kept in `sessionStorage`, so it survives a reload and ends
   with the tab. Pass `storage: localStorage` to keep it longer and share it
   between tabs; tabs then take turns renewing it. Either way, a script running
