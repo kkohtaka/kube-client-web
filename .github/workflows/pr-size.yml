@@ -1,0 +1,42 @@
+name: Pull request size
+
+# Fails a pull request that changes more lines than one person reads with
+# care. The large-change label lets one through, on purpose and visibly.
+#
+# The CI workflow checks branches of this repository when they are pushed,
+# where neither the base of the pull request nor its labels are known. Hence a
+# workflow of its own, which runs for every pull request and again when its
+# labels change. It needs nothing but the history, so it is safe for forks.
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      # Also when the base branch changes, which changes what is counted.
+      - edited
+      - labeled
+      - unlabeled
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  size:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge base of the pull request has to be in the clone.
+          fetch-depth: 0
+          persist-credentials: false
+      - run: .github/scripts/pr-size.sh "$BASE" "$HEAD"
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_SIZE_ALLOWED: ${{ contains(github.event.pull_request.labels.*.name, 'large-change') }}
