@@ -584,6 +584,10 @@ then install the browsers once with
 request, and which paths get a full read; [REVIEW.md](REVIEW.md) says what a
 review looks for. Both hold for people as much as for agents.
 
+A pull request may change at most 600 lines, not counting lockfiles, the
+changelog and changesets. The `Pull request size` workflow checks this. For a
+change that cannot be split, a maintainer adds the `large-change` label.
+
 ### Releasing
 
 Releases are driven by [Changesets](https://changesets.dev/).
