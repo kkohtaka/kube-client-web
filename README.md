@@ -390,11 +390,19 @@ changes, a sleeping laptop and API server restarts.
 
 ### In a background tab
 
-Browsers save power on pages nobody looks at. A hidden page has its timers
-slowed down; in Chromium to once a second, and after some minutes to once a
-minute. Later the browser may freeze the page, so that it does not run at all
-until the user returns, or discard it, after which it loads anew. Phones do
-all of this sooner than desktops.
+Browsers save power on pages nobody looks at, each in its own way. What the
+demo showed in a hidden tab on macOS, in November 2026:
+
+|         | Changes while hidden           | Timers while hidden                                |
+| ------- | ------------------------------ | -------------------------------------------------- |
+| Chrome  | reported as they happen        | slowed down, to once a minute after about a minute |
+| Firefox | reported as they happen        | hardly slowed down                                 |
+| Safari  | reported when the user returns | stopped after about ten seconds                    |
+
+Safari stops the page of a hidden tab altogether, for as long as the tab
+stays hidden; twelve minutes in the longest check. Chrome may also freeze a
+page, so that it does not run until the user returns, or discard it, after
+which it loads anew. Phones do all of this sooner than desktops.
 
 A watch or an informer needs no care from the page to get through this:
 
@@ -402,13 +410,18 @@ A watch or an informer needs no care from the page to get through this:
   timers are slowed down, not the network. What gets longer are the delays
   that the library measures with timers: the waits between attempts after a
   failure, and the time it takes to give up a connection that died unnoticed.
-- **While the page is frozen**, nothing is reported. When it resumes, the
-  informer first reports what the open connection had received. If the server
-  ended the watch in the meantime, it connects again from the last version it
-  saw, with the token current at that moment, and reports what it missed. If
-  that version is too old by then, which takes the API server a few minutes,
-  it lists again and reports the differences. Either way listeners are told
-  about every object's latest state, though not about every state in between.
+  A watch that the server ends is replaced as usual, and a token that runs
+  out is renewed.
+- **While the page does not run**, nothing is reported. When it runs again,
+  the informer first reports what the open connection had received. If the
+  server ended the watch in the meantime, it connects again from the last
+  version it saw, with the token current at that moment, and reports what it
+  missed. If that version is too old by then, which takes the API server a
+  few minutes, it lists again and reports the differences. Either way
+  listeners are told about every object's latest state, though not about
+  every state in between. The deadlines of a watch have passed by then; the
+  page gets two seconds to read what its connection holds before the watch
+  is given up, so that a pause alone is not reported as an error.
 - **A token that ran out meanwhile** is no obstacle. `auth.token` does not
   renew tokens on a timer but when a request needs one, so the first request
   after a long pause renews it. If the session cannot be renewed any more,
@@ -423,26 +436,44 @@ A watch or an informer needs no care from the page to get through this:
   leave connections alone.
 
 A page that acts on changes while it is hidden, for example to show a
-notification, should expect them to be late: by the delays above while it
-runs, and by any amount once the browser freezes it.
+notification, cannot count on hearing of them before the user returns: in
+Safari it does not, and elsewhere only until the browser freezes the page.
 
 ## Browser support
 
 The end-to-end tests run in Chromium, Firefox and WebKit, including an API
 server restart and a token that stops working.
 
-Background tabs are covered as far as the test browsers allow. Driven by
-Playwright, none of them puts a page in the background: a page behind another
-one stays visible, with timers at full pace. In Chromium so does a page in a
-minimized window, and it is not frozen when asked to through the DevTools
-protocol. So the tests emulate two things, in all three browsers. They make the page look
-hidden to scripts and back, which shows what the library does on
-`visibilitychange`. And they keep the page from running for a few seconds,
-longer than a watch lasts and than the page takes its token for valid, by
-keeping its thread busy; to the page's scripts that is what being frozen
-amounts to. Not tested are timers that are slowed down but still fire, a page
-the browser itself has frozen, and pauses so long that the browser or the
-network drops the connections.
+Background tabs are covered by the tests as far as the test browsers allow.
+Driven by Playwright, none of them puts a page in the background: a page
+behind another one stays visible, with timers at full pace. In Chromium so
+does a page in a minimized window, and it is not frozen when asked to through
+the DevTools protocol. So the tests emulate two things, in all three browsers.
+They make the page look hidden to scripts and back, which shows what the
+library does on `visibilitychange`. And they keep the page from running for a
+few seconds, longer than a watch lasts and than the page takes its token for
+valid, by keeping its thread busy; to the page's scripts that is what being
+frozen amounts to.
+
+What the tests cannot show was checked by hand with the demo, in Chrome,
+Firefox and Safari on macOS, in November 2026. In each of them a tab was
+hidden for more than eleven minutes, longer than a watch and the ID token
+last, while namespaces were created. A first round found two faults that have
+since been fixed: an error reported on return in Safari, and a session that a
+provider refused to renew but that was not ended. In the round after that no
+change was lost, no error was reported, the token was renewed with one
+request, and on return the watches were replaced from the version they had
+reached. A tab that returned within
+ten seconds kept its connections. In Chrome the same held for a page frozen
+through `chrome://discards` and after the machine had slept; there Chrome
+fails the open watches itself when the machine goes to sleep, so the informer
+knows at once.
+
+Not checked anywhere: sleep in Firefox and Safari, a page the browser
+discarded, phones, and pauses so long that the version a watch had reached is
+gone. The demo reaches the API server through a development server over
+HTTP/1.1; a page that talks to the API server directly was not checked by
+hand.
 
 One difference shows in WebKit, at least in the Linux build the tests use: a
 request the API server does not authenticate (no token, or one it rejects)
