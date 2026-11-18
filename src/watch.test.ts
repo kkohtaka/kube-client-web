@@ -537,6 +537,84 @@ describe("a connection the server should have ended", () => {
     expect(await first).toBeInstanceOf(WatchTimeoutError);
   });
 
+  it("is read to its end first by a page that did not run when it became overdue", async () => {
+    vi.useFakeTimers();
+    const { server, resource } = setup();
+    const events = resource.watch({ timeoutSeconds: 10 });
+    const first = events.next();
+    const connection = await server.connection(0);
+    connection.send(added("a", "1"));
+    await first;
+
+    // The page stops running for ten minutes: the clock goes on, the timers
+    // do not. When it runs again, the timer for the deadline fires late.
+    const second = events.next();
+    vi.setSystemTime(Date.now() + 600_000);
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(connection.signal.aborted).toBe(false);
+
+    // What the server sent meanwhile, and its end of the watch, arrive now.
+    connection.send(added("b", "2"));
+    expect((await second).value).toEqual(added("b", "2"));
+    const third = events.next();
+    await vi.advanceTimersByTimeAsync(1000);
+    connection.close();
+    expect((await third).done).toBe(true);
+  });
+
+  it("is given up by a page that did not run, if nothing ends it then either", async () => {
+    vi.useFakeTimers();
+    const { server, resource } = setup();
+    const first = resource
+      .watch({ timeoutSeconds: 10 })
+      .next()
+      .catch((e: unknown) => e);
+    const connection = await server.connection(0);
+
+    // Let the watch get as far as waiting for the server.
+    await vi.advanceTimersByTimeAsync(0);
+    vi.setSystemTime(Date.now() + 600_000);
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(connection.signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(connection.signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await first).toBeInstanceOf(WatchTimeoutError);
+    expect(connection.signal.aborted).toBe(true);
+  });
+
+  it("is not reported by an informer whose page did not run", async () => {
+    vi.useFakeTimers();
+    const { server, resource } = setup();
+    const errors: unknown[] = [];
+    const events = resource.watchWithReconnect({
+      resourceVersion: "5",
+      timeoutSeconds: 10,
+      onReconnect: ({ error }) => errors.push(error),
+    });
+    const first = events.next();
+    const connection = await server.connection(0);
+
+    // Let the watch get as far as waiting for the server.
+    await vi.advanceTimersByTimeAsync(0);
+    vi.setSystemTime(Date.now() + 600_000);
+    await vi.advanceTimersByTimeAsync(40_000);
+    connection.send(added("a", "6"));
+    expect((await first).value).toEqual(added("a", "6"));
+    const second = events.next();
+    connection.close();
+    await vi.advanceTimersByTimeAsync(0);
+
+    // The server ended the watch, as it does: no failure, and the next one
+    // starts where this one ended.
+    const next = await server.connection(1);
+    expect(next.url.searchParams.get("resourceVersion")).toBe("6");
+    expect(errors).toEqual([undefined]);
+    next.send(added("b", "7"));
+    await second;
+    await events.return();
+  });
+
   it("is replaced by a new one when reconnecting", async () => {
     vi.useFakeTimers();
     const { server, resource } = setup();
@@ -572,6 +650,26 @@ describe("a fetch implementation that does not react to being aborted", () => {
       .next()
       .catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(40_000);
+    expect(await first).toBeInstanceOf(WatchTimeoutError);
+  });
+
+  it("gives a page that did not run two seconds before giving up on an idle connection", async () => {
+    vi.useFakeTimers();
+    const first = deafResource()
+      .watch({ idleTimeoutMs: 1000 })
+      .next()
+      .catch((e: unknown) => e);
+    let settled = false;
+    void first.then(() => {
+      settled = true;
+    });
+
+    // Let the watch get as far as waiting for the server.
+    await vi.advanceTimersByTimeAsync(0);
+    vi.setSystemTime(Date.now() + 600_000);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(2000);
     expect(await first).toBeInstanceOf(WatchTimeoutError);
   });
 
