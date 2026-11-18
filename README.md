@@ -578,6 +578,12 @@ Install Node (see `.node-version`), pnpm, Docker, kind and kubectl on the host,
 then install the browsers once with
 `pnpm exec playwright install chromium firefox webkit`.
 
+### Proposing a change
+
+[CLAUDE.md](CLAUDE.md) says how a change is checked before it becomes a pull
+request, and which paths get a full read; [REVIEW.md](REVIEW.md) says what a
+review looks for. Both hold for people as much as for agents.
+
 ### Releasing
 
 Releases are driven by [Changesets](https://changesets.dev/).

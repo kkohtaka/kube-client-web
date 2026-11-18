@@ -14,5 +14,13 @@
         "organizeImports": "on"
       }
     }
+  },
+  "linter": {
+    "rules": {
+      "suspicious": {
+        "noSkippedTests": "error",
+        "noFocusedTests": "error"
+      }
+    }
   }
 }
