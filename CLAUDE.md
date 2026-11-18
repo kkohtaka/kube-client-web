@@ -56,6 +56,9 @@ pull request:
 
 - One purpose each. Test infrastructure and a change of behaviour go in
   separate pull requests, and so does a refactoring that a change needs first.
+- At most 600 changed lines, which the `Pull request size` workflow checks. A
+  change that cannot be split gets the `large-change` label from the person
+  who merges, not from the agent that wrote it.
 - Follow the template: Problem, Change, Risk, Not verified. "Not verified" is
   the part a reader relies on most; list what was not run or not seen.
 - A change to what users of the package get adds a changeset (`pnpm changeset`).
