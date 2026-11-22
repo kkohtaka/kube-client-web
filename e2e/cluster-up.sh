@@ -11,6 +11,8 @@ issuer=https://127.0.0.1:5556/dex
 
 # The API server only starts with the CA of the OpenID Connect provider in
 # place, so it is made before the cluster. It is kept for the next cluster.
+# The serial file is named because LibreSSL, the openssl of macOS, otherwise
+# writes it to the working directory as .srl, where git sees it.
 if [ ! -f .oidc/tls.crt ]; then
   mkdir -p .oidc
   openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
@@ -19,7 +21,8 @@ if [ ! -f .oidc/tls.crt ]; then
   openssl req -newkey rsa:2048 -nodes -subj "/CN=dex" \
     -keyout .oidc/tls.key -out .oidc/tls.csr 2>/dev/null
   openssl x509 -req -in .oidc/tls.csr -days 3650 \
-    -CA .oidc/ca.crt -CAkey .oidc/ca.key -CAcreateserial \
+    -CA .oidc/ca.crt -CAkey .oidc/ca.key \
+    -CAserial .oidc/ca.srl -CAcreateserial \
     -extfile <(printf 'subjectAltName=IP:127.0.0.1,DNS:localhost') \
     -out .oidc/tls.crt 2>/dev/null
 fi
