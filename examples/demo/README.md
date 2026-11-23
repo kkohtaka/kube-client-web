@@ -37,6 +37,20 @@ its user change nothing else: see
 [What the user may change](#what-the-user-may-change). `pnpm e2e:down` removes
 the cluster.
 
+Keep the demo to one tab. Each tab holds three watches, and all tabs and
+windows of a browser share the six connections it opens to the development
+server (see
+[How the demo differs from a real deployment](#how-the-demo-differs-from-a-real-deployment)).
+With two tabs every connection is held by a watch, and every other request,
+to the cluster or to the provider, waits until one comes free. The buttons
+that create, scale and delete seem to do nothing, a pod's log does not start,
+and even loading another page from the same address hangs. The page does not
+say why, and a tab that already showed the map keeps the status "Live". A
+watch lasts five to ten minutes, so the wait can be that long. The requests
+are not lost: they are sent as soon as a connection is free, for one when
+the other tab is closed, so a button pressed three times while nothing
+happened takes effect three times.
+
 ## What to look at
 
 - **Signing in.** `createOidcAuth` does the whole exchange with the provider.
@@ -73,7 +87,9 @@ application.
   [Signing in with OpenID Connect](../../README.md#signing-in-with-openid-connect).
   It also means the browser speaks HTTP/1.1 here, with its limit of six
   connections, of which the three watches hold three and a log that is
-  followed a fourth.
+  followed a fourth. What happens when they run out is under
+  [Running it](#running-it); for a deployed page, see "Many watches" under
+  [Connections that fail](../../README.md#connections-that-fail).
 - **The provider knows one user with a well-known password**
   ([`e2e/dex.yaml`](../../e2e/dex.yaml)). The cluster only listens on
   `127.0.0.1`.
