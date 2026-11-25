@@ -90,6 +90,16 @@ application.
   followed a fourth. What happens when they run out is under
   [Running it](#running-it); for a deployed page, see "Many watches" under
   [Connections that fail](../../README.md#connections-that-fail).
+- **The dev server holds back the answer to a watch until the watch has
+  something to report.** The API server answers a watch at once, with status
+  200 and headers, and then sends events as they happen. Through the dev
+  server the status and headers only arrive together with the first event,
+  which on a resource that does not change is the bookmark the API server
+  sends about once a minute. So the browser's network panel shows a watch as
+  pending for up to a minute although it is open and misses nothing. The demo
+  sets no `idleTimeoutMs`. A page that does, behind a proxy that behaves like
+  this, needs a value above a minute, as it does anyway to outlast the gap
+  between bookmarks.
 - **The provider knows one user with a well-known password**
   ([`e2e/dex.yaml`](../../e2e/dex.yaml)). The cluster only listens on
   `127.0.0.1`.
